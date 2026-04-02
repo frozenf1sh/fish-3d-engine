@@ -93,7 +93,9 @@ auto Model::from_file(std::string_view path)
             }
 
             // Get normals
-            if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
+            bool has_normals = (primitive.attributes.find("NORMAL") != primitive.attributes.end());
+            std::printf("  Primitive has normals: %s\n", has_normals ? "yes" : "no");
+            if (has_normals) {
                 const auto& accessor = gltf_model.accessors[primitive.attributes.at("NORMAL")];
                 const auto& buffer_view = gltf_model.bufferViews[accessor.bufferView];
                 const auto& buffer = gltf_model.buffers[buffer_view.buffer];
@@ -108,6 +110,15 @@ auto Model::from_file(std::string_view path)
                         data[i * 3 + 1],
                         data[i * 3 + 2]
                     );
+                }
+                if (accessor.count > 0) {
+                    std::printf("  First normal: (%.2f, %.2f, %.2f)\n",
+                               vertices[0].normal.x, vertices[0].normal.y, vertices[0].normal.z);
+                }
+            } else {
+                // 如果没有法线，设为默认值
+                for (size_t i = 0; i < vertices.size(); ++i) {
+                    vertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
                 }
             }
 
