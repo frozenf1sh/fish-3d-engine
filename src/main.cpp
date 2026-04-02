@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include <array>
 #include <filesystem>
 
@@ -124,6 +125,10 @@ void init_imgui(GLFWwindow* window) {
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
+  // 大幅增加字体大小 - 使用默认字体并缩放
+  io.Fonts->AddFontDefault();
+  io.FontGlobalScale = 2.0f;
+
   // 设置现代暗黑主题
   set_imgui_dark_theme();
 
@@ -174,7 +179,7 @@ void key_callback(GLFWwindow *window, int key, int, int action, int) {
   }
 }
 
-void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
+void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in) {
   if (g_context.imgui_wants_mouse || !g_context.game_running) {
     return;
   }
@@ -186,15 +191,22 @@ void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
     g_context.last_x = xpos;
     g_context.last_y = ypos;
     g_context.first_mouse = false;
+    return;
   }
 
-  float x_offset = xpos - g_context.last_x;
-  float y_offset = g_context.last_y - ypos;
+  // 计算鼠标移动偏移
+  int win_width, win_height;
+  glfwGetWindowSize(window, &win_width, &win_height);
+  float center_x = static_cast<float>(win_width) / 2.0f;
+  float center_y = static_cast<float>(win_height) / 2.0f;
 
-  g_context.last_x = xpos;
-  g_context.last_y = ypos;
+  float x_offset = xpos - center_x;
+  float y_offset = center_y - ypos;
 
-  g_context.camera.process_mouse_movement(x_offset, y_offset);
+  // 只有当偏移足够大时才处理，减少抖动
+  if (std::abs(x_offset) > 0.1f || std::abs(y_offset) > 0.1f) {
+    g_context.camera.process_mouse_movement(x_offset, y_offset);
+  }
 }
 
 void scroll_callback(GLFWwindow*, double, double yoffset) {
@@ -268,8 +280,13 @@ int main() {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
+  // 获取主显示器
+  GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+  const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+  // 全屏窗口
   GLFWwindow *window = glfwCreateWindow(
-      800, 600, "Fish Engine - ECS Architecture", nullptr, nullptr);
+      mode->width, mode->height, "Fish Engine - ECS Architecture", monitor, nullptr);
 
   if (!window) {
     std::fprintf(stderr, "Failed to create GLFW window!\n");
@@ -457,6 +474,10 @@ int main() {
     bool save_scene = false;
     bool load_scene = false;
 
+    // 获取窗口尺寸
+    int window_width, window_height;
+    glfwGetWindowSize(window, &window_width, &window_height);
+
     // 视口尺寸
     ImVec2 viewport_size(0, 0);
     bool viewport_size_changed = false;
@@ -466,6 +487,16 @@ int main() {
       float current_frame = static_cast<float>(glfwGetTime());
       g_context.delta_time = current_frame - g_context.last_frame;
       g_context.last_frame = current_frame;
+
+      // 如果在游戏模式下，强制鼠标在窗口中心
+      if (g_context.game_running) {
+        double center_x = static_cast<double>(window_width) / 2.0;
+        double center_y = static_cast<double>(window_height) / 2.0;
+        glfwSetCursorPos(window, center_x, center_y);
+        // 更新 last_x, last_y 为中心位置
+        g_context.last_x = static_cast<float>(center_x);
+        g_context.last_y = static_cast<float>(center_y);
+      }
 
       process_input(window);
       glfwPollEvents();
