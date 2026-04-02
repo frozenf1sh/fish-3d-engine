@@ -3,6 +3,7 @@
 #include <cmath>
 #include <array>
 #include <filesystem>
+#include <format>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -49,6 +50,11 @@ struct Context {
   bool imgui_wants_keyboard = false;
   bool game_running = false;  // 游戏是否在运行（鼠标捕获状态）
 } g_context;
+
+// 编辑器状态
+struct EditorContext {
+  entt::entity selected_entity = entt::null;
+} g_editor_context;
 
 // ImGui 暗黑主题
 void set_imgui_dark_theme() {
@@ -772,23 +778,124 @@ int main() {
       ImGui::End();
       ImGui::PopStyleVar();
 
-      // Properties 窗口
-      ImGui::Begin("Properties");
-      ImGui::Text("Entities: %zu",
-                  static_cast<size_t>(std::distance(registry.view<entt::entity>().begin(),
-                                                    registry.view<entt::entity>().end())));
-      ImGui::Separator();
-      ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)",
-                  g_context.camera.get_position().x,
-                  g_context.camera.get_position().y,
-                  g_context.camera.get_position().z);
-      ImGui::Separator();
-      ImGui::Text("Controls:");
-      ImGui::BulletText("Click Play or click viewport to enter game mode");
-      ImGui::BulletText("F1: Toggle game/edit mode");
-      ImGui::BulletText("ESC: Exit game mode / Quit");
-      ImGui::BulletText("WASD: Move camera");
-      ImGui::BulletText("Mouse: Look around");
+      // Hierarchy 层级面板
+      ImGui::Begin("Hierarchy");
+
+      // 右键点击空白处创建空实体
+      if (ImGui::BeginPopupContextWindow("HierarchyContextMenu")) {
+        if (ImGui::MenuItem("Create Empty Entity")) {
+          auto new_entity = registry.create();
+          registry.emplace<TagComponent>(new_entity, "New Entity");
+          registry.emplace<TransformComponent>(new_entity);
+        }
+        ImGui::EndPopup();
+      }
+
+      // 遍历所有实体
+      auto all_entities = registry.view<entt::entity>();
+      for (auto entity : all_entities) {
+        std::string entity_name;
+        if (auto* tag = registry.try_get<TagComponent>(entity)) {
+          entity_name = tag->tag;
+        } else {
+          entity_name = std::format("Entity {}", static_cast<uint32_t>(entity));
+        }
+
+        // 使用 Selectable 显示实体
+        bool is_selected = (g_editor_context.selected_entity == entity);
+        if (ImGui::Selectable(entity_name.c_str(), is_selected)) {
+          g_editor_context.selected_entity = entity;
+        }
+
+        // 右键点击实体
+        if (ImGui::BeginPopupContextItem(std::format("EntityContext_{}", static_cast<uint32_t>(entity)).c_str())) {
+          if (ImGui::MenuItem("Delete Entity")) {
+            if (g_editor_context.selected_entity == entity) {
+              g_editor_context.selected_entity = entt::null;
+            }
+            registry.destroy(entity);
+          }
+          ImGui::EndPopup();
+        }
+      }
+
+      ImGui::End();
+
+      // Inspector 属性面板
+      ImGui::Begin("Inspector");
+
+      if (g_editor_context.selected_entity != entt::null && registry.valid(g_editor_context.selected_entity)) {
+        auto selected = g_editor_context.selected_entity;
+
+        // 显示 TagComponent
+        if (auto* tag = registry.try_get<TagComponent>(selected)) {
+          if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen)) {
+            static char tag_buffer[256];
+            strncpy(tag_buffer, tag->tag.c_str(), sizeof(tag_buffer) - 1);
+            if (ImGui::InputText("Name", tag_buffer, sizeof(tag_buffer))) {
+              tag->tag = tag_buffer;
+            }
+          }
+        }
+
+        // 显示并编辑 TransformComponent
+        if (auto* transform = registry.try_get<TransformComponent>(selected)) {
+          if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+
+            // 使用欧拉角编辑旋转
+            glm::vec3 euler = glm::degrees(transform->get_rotation_euler());
+            if (ImGui::DragFloat3("Rotation", &euler.x, 1.0f, -180.0f, 180.0f)) {
+              transform->set_rotation_euler(glm::radians(euler));
+            }
+
+            ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f, 0.01f, 10.0f);
+          }
+        }
+
+        // 显示并编辑 LightComponent
+        if (auto* light = registry.try_get<LightComponent>(selected)) {
+          if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::ColorEdit3("Color", &light->color.x);
+            ImGui::DragFloat3("Direction", &light->direction.x, 0.1f, -1.0f, 1.0f);
+            light->direction = glm::normalize(light->direction);
+            ImGui::DragFloat("Intensity", &light->intensity, 0.1f, 0.0f, 10.0f);
+          }
+        }
+
+        // 显示 MeshComponent
+        if (auto* mesh = registry.try_get<MeshComponent>(selected)) {
+          if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("Model: %s", mesh->model_path.c_str());
+            if (mesh->model) {
+              ImGui::Text("Meshes: %zu", mesh->model->get_meshes().size());
+            }
+          }
+        }
+
+        // Add Component 按钮
+        ImGui::Separator();
+        if (ImGui::Button("Add Component")) {
+          ImGui::OpenPopup("AddComponentPopup");
+        }
+
+        if (ImGui::BeginPopup("AddComponentPopup")) {
+          if (!registry.all_of<LightComponent>(selected)) {
+            if (ImGui::MenuItem("Light Component")) {
+              registry.emplace<LightComponent>(selected);
+            }
+          }
+          if (!registry.all_of<MeshComponent>(selected)) {
+            if (ImGui::MenuItem("Mesh Component")) {
+              registry.emplace<MeshComponent>(selected);
+            }
+          }
+          ImGui::EndPopup();
+        }
+      } else {
+        ImGui::Text("No entity selected");
+      }
+
       ImGui::End();
 
       // Debug 窗口 - 显示在底部
