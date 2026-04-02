@@ -127,7 +127,7 @@ void main()
     vec3 diffuse = diff * uLightColor * base_color;
 
     // 镜面反射 (Blinn-Phong)
-    float specular_strength = 0.5 * (1.0 - uRoughness));
+    float specular_strength = 0.5 * (1.0 - uRoughness);
     vec3 halfway_dir = normalize(light_dir + view_dir);
     float spec = pow(max(dot(norm, halfway_dir), 0.0), 32.0);
     vec3 specular = specular_strength * spec * uLightColor;
