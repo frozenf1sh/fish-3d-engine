@@ -10,6 +10,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(EnTT CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # tinygltf is header-only
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
@@ -27,6 +29,8 @@ add_executable(${PROJECT_NAME}
     src/graphics/Mesh.cpp
     src/graphics/Model.cpp
     src/graphics/Framebuffer.cpp
+    src/scene/RenderSystem.cpp
+    src/scene/SceneSerializer.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -46,6 +50,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     glad::glad
     glm::glm
+    EnTT::EnTT
+    nlohmann_json::nlohmann_json
 )
 
 if(MSVC)

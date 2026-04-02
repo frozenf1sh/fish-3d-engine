@@ -1,12 +1,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <array>
+#include <filesystem>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include <entt/entt.hpp>
 
 #include "graphics/Shader.hpp"
 #include "graphics/Buffer.hpp"
@@ -16,7 +19,10 @@
 #include "graphics/Texture2D.hpp"
 #include "graphics/Framebuffer.hpp"
 
+#include "scene/Scene.hpp"
+
 using namespace fish::graphics;
+using namespace fish::scene;
 
 // 全局状态
 struct Context {
@@ -49,6 +55,16 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action,
     glfwSetInputMode(window, GLFW_CURSOR,
                      cursor_enabled ? GLFW_CURSOR_NORMAL
                                     : GLFW_CURSOR_DISABLED);
+  }
+
+  // F5: 保存场景
+  if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
+    std::printf("Saving scene to scene.json...\n");
+  }
+
+  // F9: 加载场景
+  if (key == GLFW_KEY_F9 && action == GLFW_PRESS) {
+    std::printf("Loading scene from scene.json...\n");
   }
 }
 
@@ -91,32 +107,47 @@ void process_input(GLFWwindow *window) {
                                       g_context.delta_time);
 }
 
-/// @brief 绘制场景（用于阴影 Pass 和最终 Pass）
-/// @param shader 要使用的着色器
-/// @param model_matrix 模型矩阵
-/// @param model 狐狸模型
-/// @param floor_vao 地板 VAO
-/// @param floor_index_count 地板索引数量
-void draw_scene(const Shader &shader, const glm::mat4 &model_matrix,
-                const Model &model, const VertexArray &floor_vao,
-                size_t floor_index_count) {
-  // 绘制狐狸模型
-  for (const auto &mesh : model.get_meshes()) {
-    const auto &material = mesh.get_material();
+/// @brief 创建地板实体
+void create_floor_entity(entt::registry& registry) {
+  auto entity = registry.create();
+  registry.emplace<TagComponent>(entity, "Floor");
 
-    // 只在非阴影 Pass 时设置材质属性
-    // 阴影 Pass 的着色器只需要位置
-    shader.set_uniform("uModel", model_matrix);
-    mesh.draw();
-  }
+  // 地板位置
+  auto& transform = registry.emplace<TransformComponent>(entity);
+  transform.position = glm::vec3(0.0f, -0.5f, 0.0f);
 
-  // 绘制地板
-  glm::mat4 floor_model = glm::mat4(1.0f);
-  floor_model = glm::translate(floor_model, glm::vec3(0.0f, -0.5f, 0.0f));
-  shader.set_uniform("uModel", floor_model);
-  floor_vao.bind();
-  glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(floor_index_count),
-                 GL_UNSIGNED_INT, nullptr);
+  // 创建地板模型（简单的平面）
+  // 注意：这里我们用一个空模型，在 main 循环中单独处理地板
+  // 或者可以创建一个真正的地板 Model
+}
+
+/// @brief 创建狐狸实体
+auto create_fox_entity(entt::registry& registry, std::shared_ptr<Model> model)
+    -> entt::entity
+{
+  auto entity = registry.create();
+  registry.emplace<TagComponent>(entity, "Fox");
+
+  auto& transform = registry.emplace<TransformComponent>(entity);
+  transform.position = glm::vec3(0.0f, -0.45f, 0.0f);
+  transform.scale = glm::vec3(0.01f);
+
+  registry.emplace<MeshComponent>(entity, std::move(model), "assets/models/Fox.gltf");
+
+  return entity;
+}
+
+/// @brief 创建光源实体
+auto create_light_entity(entt::registry& registry,
+                         const glm::vec3& color,
+                         const glm::vec3& direction)
+    -> entt::entity
+{
+  auto entity = registry.create();
+  registry.emplace<TagComponent>(entity, "DirectionalLight");
+  registry.emplace<TransformComponent>(entity);
+  registry.emplace<LightComponent>(entity, color, direction, 1.0f);
+  return entity;
 }
 
 int main() {
@@ -135,7 +166,7 @@ int main() {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 
   GLFWwindow *window = glfwCreateWindow(
-      800, 600, "Fish Engine - Directional Shadow Mapping", nullptr, nullptr);
+      800, 600, "Fish Engine - ECS Architecture", nullptr, nullptr);
 
   if (!window) {
     std::fprintf(stderr, "Failed to create GLFW window!\n");
@@ -180,7 +211,13 @@ int main() {
     // 作用域块：所有 OpenGL 资源在此作用域内创建和销毁
 
     //======================================================================
-    // 1. 创建着色器
+    // 1. 创建 ECS 注册表
+    //======================================================================
+    entt::registry registry;
+    SceneSerializer serializer(registry);
+
+    //======================================================================
+    // 2. 创建着色器
     //======================================================================
 
     // 主着色器（带阴影计算）
@@ -188,13 +225,6 @@ int main() {
                                            "assets/shaders/model.frag");
     if (!shader_result) {
       std::fprintf(stderr, "%s\n", shader_result.error().c_str());
-      // 清理回调
-      glfwSetKeyCallback(window, nullptr);
-      glfwSetCursorPosCallback(window, nullptr);
-      glfwSetScrollCallback(window, nullptr);
-      glfwSetFramebufferSizeCallback(window, nullptr);
-      glfwDestroyWindow(window);
-      glfwTerminate();
       return EXIT_FAILURE;
     }
     auto shader = std::move(*shader_result);
@@ -204,19 +234,12 @@ int main() {
                                                   "assets/shaders/shadow.frag");
     if (!shadow_shader_result) {
       std::fprintf(stderr, "%s\n", shadow_shader_result.error().c_str());
-      // 清理回调
-      glfwSetKeyCallback(window, nullptr);
-      glfwSetCursorPosCallback(window, nullptr);
-      glfwSetScrollCallback(window, nullptr);
-      glfwSetFramebufferSizeCallback(window, nullptr);
-      glfwDestroyWindow(window);
-      glfwTerminate();
       return EXIT_FAILURE;
     }
     auto shadow_shader = std::move(*shadow_shader_result);
 
     //======================================================================
-    // 2. 创建阴影贴图 FBO
+    // 3. 创建阴影贴图 FBO
     //======================================================================
 
     const unsigned int SHADOW_WIDTH = 2048;
@@ -225,7 +248,7 @@ int main() {
     std::printf("Shadow map created: %dx%d\n", SHADOW_WIDTH, SHADOW_HEIGHT);
 
     //======================================================================
-    // 3. 加载模型和创建地板
+    // 4. 加载模型和创建场景
     //======================================================================
 
     // 加载狐狸模型
@@ -233,30 +256,26 @@ int main() {
     auto model_result = Model::from_file("assets/models/Fox.gltf");
     if (!model_result) {
       std::fprintf(stderr, "%s\n", model_result.error().c_str());
-      // 清理回调
-      glfwSetKeyCallback(window, nullptr);
-      glfwSetCursorPosCallback(window, nullptr);
-      glfwSetScrollCallback(window, nullptr);
-      glfwSetFramebufferSizeCallback(window, nullptr);
-      glfwDestroyWindow(window);
-      glfwTerminate();
       return EXIT_FAILURE;
     }
-    auto model = std::move(*model_result);
-    std::printf("Model loaded! %zu meshes\n", model.get_meshes().size());
-    for (size_t i = 0; i < model.get_meshes().size(); ++i) {
-      const auto &mesh = model.get_meshes()[i];
-      std::printf("  Mesh %zu: %zu vertices, %zu indices, has texture: %s\n", i,
-                  mesh.get_vertex_count(), mesh.get_index_count(),
-                  mesh.get_material().base_color_texture ? "yes" : "no");
-      if (mesh.get_vertex_count() > 0) {
-        // 检查第一个顶点的法线是否非零
-        const auto &v = mesh.get_material(); // 只是为了获取顶点结构体类型 -
-                                             // 需要用不同的方式
-      }
-    }
+    auto fox_model = std::make_shared<Model>(std::move(*model_result));
+    std::printf("Model loaded! %zu meshes\n", fox_model->get_meshes().size());
 
-    // 创建地板平面顶点数据
+    // 创建场景实体
+    create_fox_entity(registry, fox_model);
+
+    // 方向光 - 从上方打下来
+    glm::vec3 light_pos = glm::vec3(5.0f, 12.0f, 5.0f);
+    glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 light_dir = glm::normalize(light_pos - light_target);
+    glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    create_light_entity(registry, light_color, light_dir);
+
+    //======================================================================
+    // 5. 创建地板（保持独立，因为它是简单的几何体）
+    //======================================================================
+
     struct FloorVertex {
       glm::vec3 position;
       glm::vec3 normal;
@@ -272,7 +291,6 @@ int main() {
 
     const std::array<unsigned int, 6> floor_indices = {0, 1, 2, 2, 3, 0};
 
-    // 创建地板的 Buffer 和 VAO
     auto floor_vbo = Buffer::create(BufferType::Vertex, floor_vertices.data(),
                                     floor_vertices.size());
     auto floor_ebo = Buffer::create(BufferType::Index, floor_indices.data(),
@@ -283,33 +301,22 @@ int main() {
     floor_vao.set_vertex_buffer(0, floor_vbo, 0, floor_stride);
     floor_vao.set_index_buffer(floor_ebo);
 
-    // Position attribute
     floor_vao.set_attribute(0, 0, AttributeType::Float, 3, GL_FALSE,
                             offsetof(FloorVertex, position));
     floor_vao.enable_attribute(0);
 
-    // Normal attribute
     floor_vao.set_attribute(1, 0, AttributeType::Float, 3, GL_FALSE,
                             offsetof(FloorVertex, normal));
     floor_vao.enable_attribute(1);
 
-    // TexCoord attribute
     floor_vao.set_attribute(2, 0, AttributeType::Float, 2, GL_FALSE,
                             offsetof(FloorVertex, tex_coord));
     floor_vao.enable_attribute(2);
 
-    //======================================================================
-    // 4. 光源参数
-    //======================================================================
-
-    // 方向光 - 从上方打下来，能看到阴影投射到地面
-    glm::vec3 light_pos = glm::vec3(5.0f, 12.0f, 5.0f);
-    glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 light_dir = glm::normalize(light_pos - light_target); // 注意：这里是从目标指向光源！
-    glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::mat4 floor_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.5f, 0.0f));
 
     //======================================================================
-    // 5. 主循环
+    // 6. 主循环
     //======================================================================
 
     std::printf("\n=== 控制说明 ===\n");
@@ -318,13 +325,20 @@ int main() {
     std::printf("鼠标: 视角\n");
     std::printf("滚轮: 缩放 FOV\n");
     std::printf("F1: 切换鼠标捕获\n");
+    std::printf("F5: 保存场景\n");
+    std::printf("F9: 加载场景\n");
     std::printf("ESC: 退出\n\n");
-    std::printf("=== 阴影映射特性 ===\n");
-    std::printf("- Directional Light (方向光)\n");
-    std::printf("- PCF Soft Shadows (4x4采样软阴影)\n");
-    std::printf("- Shadow Bias (阴影偏移防止痤疮)\n\n");
+    std::printf("=== ECS 架构特性 ===\n");
+    std::printf("- Entt ECS 系统\n");
+    std::printf("- Scene Serialization (JSON)\n");
+    std::printf("- Directional Shadow Mapping\n");
+    std::printf("- PCF Soft Shadows\n\n");
 
-    while (!glfwWindowShouldClose(window)) {
+    bool save_scene = false;
+    bool load_scene = false;
+
+    while (!glfwSetWindowShouldClose(window, GLFW_FALSE),
+           !glfwWindowShouldClose(window)) {
       // 计算 delta time
       float current_frame = static_cast<float>(glfwGetTime());
       g_context.delta_time = current_frame - g_context.last_frame;
@@ -333,12 +347,42 @@ int main() {
       process_input(window);
       glfwPollEvents();
 
+      // 检查场景保存/加载
+      if (glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS && !save_scene) {
+        save_scene = true;
+        std::printf("Saving scene to scene.json...\n");
+        if (serializer.serialize("scene.json")) {
+          std::printf("Scene saved successfully!\n");
+        }
+      }
+      if (glfwGetKey(window, GLFW_KEY_F5) == GLFW_RELEASE) {
+        save_scene = false;
+      }
+
+      if (glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS && !load_scene) {
+        load_scene = true;
+        std::printf("Loading scene from scene.json...\n");
+        if (std::filesystem::exists("scene.json")) {
+          if (serializer.deserialize("scene.json")) {
+            std::printf("Scene loaded successfully!\n");
+          }
+        } else {
+          std::printf("scene.json not found, creating default scene...\n");
+          // 重新创建默认场景
+          registry.clear();
+          create_fox_entity(registry, fox_model);
+          create_light_entity(registry, light_color, light_dir);
+        }
+      }
+      if (glfwGetKey(window, GLFW_KEY_F9) == GLFW_RELEASE) {
+        load_scene = false;
+      }
+
       //==================================================================
       // Pass 1: Shadow Pass（阴影渲染 Pass）
       //==================================================================
 
-      // 1.1 设置光源的正交投影矩阵（方向光用正交投影）
-      // 正交投影覆盖的范围需要足够大，包含场景中所有投射阴影的物体
+      // 设置光源的正交投影矩阵
       float ortho_left = -10.0f;
       float ortho_right = 10.0f;
       float ortho_bottom = -10.0f;
@@ -350,92 +394,77 @@ int main() {
           glm::ortho(ortho_left, ortho_right, ortho_bottom, ortho_top,
                      ortho_near, ortho_far);
 
-      // 1.2 设置光源的观察矩阵
       glm::mat4 light_view =
           glm::lookAt(light_pos, light_target, glm::vec3(0.0f, 1.0f, 0.0f));
 
-      // 1.3 光源空间矩阵 = 投影 * 观察
       glm::mat4 light_space_matrix = light_projection * light_view;
 
-      // 1.4 绑定阴影 FBO，设置视口
+      // 阴影 Pass - 先渲染 ECS 中的实体
       shadow_fbo.bind();
       glViewport(0, 0, shadow_fbo.width(), shadow_fbo.height());
       glClear(GL_DEPTH_BUFFER_BIT);
 
-      // 1.5 使用阴影着色器，只渲染深度
       shadow_shader.bind();
       shadow_shader.set_uniform("uLightSpaceMatrix", light_space_matrix);
 
-      // 狐狸模型矩阵 - 向下移动到地面（两个 Pass 都用这个位置）
-      glm::mat4 fox_model_matrix = glm::mat4(1.0f);
-      fox_model_matrix =
-          glm::translate(fox_model_matrix, glm::vec3(0.0f, -0.45f, 0.0f));
-      fox_model_matrix = glm::scale(fox_model_matrix, glm::vec3(0.01f));
+      // 渲染 ECS 实体到阴影贴图
+      auto shadow_view = registry.view<TransformComponent, MeshComponent>();
+      for (auto entity : shadow_view) {
+        auto& transform = shadow_view.get<TransformComponent>(entity);
+        auto& mesh_comp = shadow_view.get<MeshComponent>(entity);
 
-      // 1.6 绘制场景（狐狸 + 地板）到阴影贴图
-      draw_scene(shadow_shader, fox_model_matrix, model, floor_vao,
-                 floor_indices.size());
+        if (!mesh_comp.model) continue;
+
+        shadow_shader.set_uniform("uModel", transform.get_model_matrix());
+        for (const auto& mesh : mesh_comp.model->get_meshes()) {
+          mesh.draw();
+        }
+      }
+
+      // 渲染地板到阴影贴图
+      shadow_shader.set_uniform("uModel", floor_model_matrix);
+      floor_vao.bind();
+      glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(floor_indices.size()),
+                     GL_UNSIGNED_INT, nullptr);
+
+      shadow_fbo.unbind();
 
       //==================================================================
       // Pass 2: Lighting Pass（光照渲染 Pass）
       //==================================================================
 
-      // 2.1 解绑 FBO，恢复默认视口
-      shadow_fbo.unbind();
       glfwGetFramebufferSize(window, &width, &height);
       glViewport(0, 0, width, height);
 
-      // 2.2 清除颜色和深度缓冲
       glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      // 2.3 使用主着色器
       shader.bind();
 
-      // 2.4 设置 MVP 矩阵
-      float aspect_ratio =
-          static_cast<float>(width) / static_cast<float>(height);
+      // 设置 VP 矩阵
+      float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
       glm::mat4 view_matrix = g_context.camera.get_view_matrix();
-      glm::mat4 projection_matrix =
-          g_context.camera.get_projection_matrix(aspect_ratio);
+      glm::mat4 projection_matrix = g_context.camera.get_projection_matrix(aspect_ratio);
 
       shader.set_uniform("uView", view_matrix);
       shader.set_uniform("uProjection", projection_matrix);
-
-      // 2.5 设置光照参数
-      shader.set_uniform("uLightPos", light_pos);
       shader.set_uniform("uViewPos", g_context.camera.get_position());
+
+      // 设置光源参数
+      shader.set_uniform("uLightPos", light_pos);
       shader.set_uniform("uLightColor", light_color);
       shader.set_uniform("uLightDir", light_dir);
 
-      // 2.6 设置阴影相关参数
+      // 设置阴影相关参数
       shader.set_uniform("uLightSpaceMatrix", light_space_matrix);
-      shadow_fbo.bind_depth_texture(1);    // 纹理单元 1
-      shader.set_uniform("uShadowMap", 1); // 告诉着色器用纹理单元 1
+      shadow_fbo.bind_depth_texture(1);
+      shader.set_uniform("uShadowMap", 1);
 
-      // 2.7 绘制场景（狐狸 + 地板）- 这次带纹理和阴影
-      for (const auto &mesh : model.get_meshes()) {
-        const auto &material = mesh.get_material();
-        shader.set_uniform("uModel", fox_model_matrix); // 关键：设置狐狸的 model_matrix！
-        shader.set_uniform("uBaseColor", material.base_color);
-        shader.set_uniform("uMetallic", material.metallic);
-        shader.set_uniform("uRoughness", material.roughness);
-        shader.set_uniform("uHasTexture",
-                           material.base_color_texture != nullptr);
+      // 使用 RenderSystem 渲染 ECS 实体
+      RenderSystem::render(registry, shader, g_context.camera, aspect_ratio);
 
-        // 绑定漫反射纹理到纹理单元 0
-        if (material.base_color_texture) {
-          material.base_color_texture->bind(0);
-        }
-        shader.set_uniform("uBaseColorTexture", 0);
-
-        mesh.draw();
-      }
-
-      // 2.8 绘制地板（简单白色）
-      glm::mat4 floor_model = glm::mat4(1.0f);
-      floor_model = glm::translate(floor_model, glm::vec3(0.0f, -0.5f, 0.0f));
-      shader.set_uniform("uModel", floor_model);
+      // 绘制地板
+      shader.set_uniform("uModel", floor_model_matrix);
       shader.set_uniform("uBaseColor", glm::vec3(0.6f, 0.6f, 0.6f));
       shader.set_uniform("uMetallic", 0.0f);
       shader.set_uniform("uRoughness", 1.0f);
@@ -445,11 +474,9 @@ int main() {
       glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(floor_indices.size()),
                      GL_UNSIGNED_INT, nullptr);
 
-      // 2.9 交换缓冲区
+      // 交换缓冲区
       glfwSwapBuffers(window);
     }
-
-    // shader 和 model 在此作用域结束时析构
   }
 
   // 清理回调以防止退出时段错误

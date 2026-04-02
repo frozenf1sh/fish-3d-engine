@@ -23,14 +23,21 @@ public:
     static auto from_file(std::string_view path)
         -> std::expected<Model, std::string>;
 
+    Model() = default;
+    ~Model() = default;
+
+    Model(const Model&) = delete;
+    auto operator=(const Model&) -> Model& = delete;
+
+    Model(Model&&) noexcept = default;
+    auto operator=(Model&&) noexcept -> Model& = default;
+
     void draw() const;
 
     [[nodiscard]] auto get_meshes() const -> const std::vector<Mesh>& { return m_meshes; }
     [[nodiscard]] auto get_directory() const -> const std::filesystem::path& { return m_directory; }
 
 private:
-    Model() = default;
-
     std::vector<Mesh> m_meshes;
     std::unordered_map<int, std::shared_ptr<Texture2D>> m_textures;
     std::filesystem::path m_directory;

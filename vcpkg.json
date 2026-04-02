@@ -17,6 +17,12 @@
     },
     {
       "name": "stb"
+    },
+    {
+      "name": "entt"
+    },
+    {
+      "name": "nlohmann-json"
     }
   ]
 }
