@@ -197,6 +197,42 @@ auto Model::from_file(std::string_view path)
                 }
             }
 
+            // 如果没有法线，手动计算（假设是三角形列表）
+            if (!has_normals && vertices.size() >= 3) {
+                std::printf("  Calculating normals...\n");
+                // 先清零
+                for (auto& v : vertices) {
+                    v.normal = glm::vec3(0.0f);
+                }
+                // 计算每个三角形的法线，并累加到顶点
+                for (size_t i = 0; i < vertices.size(); i += 3) {
+                    if (i + 2 >= vertices.size()) break;
+                    glm::vec3 v0 = vertices[i + 0].position;
+                    glm::vec3 v1 = vertices[i + 1].position;
+                    glm::vec3 v2 = vertices[i + 2].position;
+                    // 计算三角形法线（叉乘）
+                    glm::vec3 edge1 = v1 - v0;
+                    glm::vec3 edge2 = v2 - v0;
+                    glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+                    // 累加到三个顶点
+                    vertices[i + 0].normal += normal;
+                    vertices[i + 1].normal += normal;
+                    vertices[i + 2].normal += normal;
+                }
+                // 归一化每个顶点的法线
+                for (auto& v : vertices) {
+                    if (glm::length(v.normal) > 0.0001f) {
+                        v.normal = glm::normalize(v.normal);
+                    } else {
+                        v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+                    }
+                }
+                if (!vertices.empty()) {
+                    std::printf("  First calculated normal: (%.2f, %.2f, %.2f)\n",
+                               vertices[0].normal.x, vertices[0].normal.y, vertices[0].normal.z);
+                }
+            }
+
             model.m_meshes.emplace_back(std::move(vertices), std::move(indices), std::move(material));
         }
     }
