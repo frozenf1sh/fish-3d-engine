@@ -316,8 +316,8 @@ int main()
         // 4. 光源参数
         //======================================================================
 
-        // 方向光 - 从这个位置看向原点
-        glm::vec3 light_pos = glm::vec3(3.0f, 4.0f, 2.0f);
+        // 方向光 - 从上方打下来，能看到阴影投射到地面
+        glm::vec3 light_pos = glm::vec3(5.0f, 8.0f, 5.0f);
         glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::vec3 light_dir = glm::normalize(light_target - light_pos);
         glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -354,12 +354,12 @@ int main()
 
             // 1.1 设置光源的正交投影矩阵（方向光用正交投影）
             // 正交投影覆盖的范围需要足够大，包含场景中所有投射阴影的物体
-            float ortho_left = -15.0f;
-            float ortho_right = 15.0f;
-            float ortho_bottom = -15.0f;
-            float ortho_top = 15.0f;
+            float ortho_left = -10.0f;
+            float ortho_right = 10.0f;
+            float ortho_bottom = -10.0f;
+            float ortho_top = 10.0f;
             float ortho_near = 1.0f;
-            float ortho_far = 30.0f;
+            float ortho_far = 20.0f;
 
             glm::mat4 light_projection = glm::ortho(
                 ortho_left, ortho_right, ortho_bottom, ortho_top, ortho_near, ortho_far
@@ -380,9 +380,9 @@ int main()
             shadow_shader.bind();
             shadow_shader.set_uniform("uLightSpaceMatrix", light_space_matrix);
 
-            // 狐狸模型矩阵
+            // 狐狸模型矩阵 - 向下移动到地面
             glm::mat4 model_matrix = glm::mat4(1.0f);
-            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, 0.0f, 0.0f));
+            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, -0.35f, 0.0f));
             model_matrix = glm::scale(model_matrix, glm::vec3(0.01f));
 
             // 1.6 绘制场景（狐狸 + 地板）到阴影贴图
