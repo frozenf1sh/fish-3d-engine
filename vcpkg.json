@@ -27,6 +27,9 @@
     {
       "name": "imgui",
       "features": ["docking-experimental", "glfw-binding", "opengl3-binding"]
+    },
+    {
+      "name": "portable-file-dialogs"
     }
   ]
 }
