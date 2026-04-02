@@ -162,126 +162,139 @@ int main()
     // 开启深度测试
     glEnable(GL_DEPTH_TEST);
 
-    // 创建着色器
-    auto shader_result = Shader::from_file(
-        "assets/shaders/cube.vert",
-        "assets/shaders/cube.frag"
-    );
-    if (!shader_result) {
-        std::fprintf(stderr, "%s\n", shader_result.error().c_str());
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return EXIT_FAILURE;
-    }
-    auto shader = std::move(*shader_result);
-
-    // 立方体顶点数据（带颜色）
-    const std::array vertices = {
-        // 前面
-        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-        // 后面
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        // 上面
-        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-        // 下面
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        // 右面
-        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-        // 左面
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-    };
-
-    // 创建顶点缓冲区
-    auto vbo = Buffer::create(BufferType::Vertex, vertices.data(), vertices.size());
-
-    // 创建 VAO
-    VertexArray vao;
-
-    // 设置顶点缓冲区绑定 (binding index 0)
-    constexpr GLsizei stride = sizeof(Vertex);
-    vao.set_vertex_buffer(0, vbo, 0, stride);
-
-    // 设置位置属性 (attrib index 0)
-    vao.set_attribute(0, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, pos));
-    vao.enable_attribute(0);
-
-    // 设置颜色属性 (attrib index 1)
-    vao.set_attribute(1, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, color));
-    vao.enable_attribute(1);
-
-    // 绑定 VAO 和着色器
-    vao.bind();
-    shader.bind();
-
-    std::printf("\n=== 控制说明 ===\n");
-    std::printf("WASD: 移动\n");
-    std::printf("空格/Shift: 上升/下降\n");
-    std::printf("鼠标: 视角\n");
-    std::printf("滚轮: 缩放 FOV\n");
-    std::printf("F1: 切换鼠标捕获\n");
-    std::printf("ESC: 退出\n\n");
-
-    while (!glfwWindowShouldClose(window))
     {
-        // 计算 delta time
-        float current_frame = static_cast<float>(glfwGetTime());
-        g_context.delta_time = current_frame - g_context.last_frame;
-        g_context.last_frame = current_frame;
+        // 作用域块：所有 OpenGL 资源在此作用域内创建和销毁
+        // 确保在 glfwTerminate() 之前析构
 
-        process_input(window);
-        glfwPollEvents();
+        // 创建着色器
+        auto shader_result = Shader::from_file(
+            "assets/shaders/cube.vert",
+            "assets/shaders/cube.frag"
+        );
+        if (!shader_result) {
+            std::fprintf(stderr, "%s\n", shader_result.error().c_str());
+            // 清理回调
+            glfwSetKeyCallback(window, nullptr);
+            glfwSetCursorPosCallback(window, nullptr);
+            glfwSetScrollCallback(window, nullptr);
+            glfwSetFramebufferSizeCallback(window, nullptr);
+            glfwDestroyWindow(window);
+            glfwTerminate();
+            return EXIT_FAILURE;
+        }
+        auto shader = std::move(*shader_result);
 
-        // 清除颜色和深度缓冲
-        glClearColor(0.2f, 0.4f, 0.8f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // 立方体顶点数据（带颜色）
+        const std::array vertices = {
+            // 前面
+            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+            // 后面
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+            // 上面
+            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+            // 下面
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+            // 右面
+            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+            // 左面
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        };
 
-        // 获取窗口尺寸
-        glfwGetFramebufferSize(window, &width, &height);
-        float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+        // 创建顶点缓冲区
+        auto vbo = Buffer::create(BufferType::Vertex, vertices.data(), vertices.size());
 
-        // 设置 MVP 矩阵
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 view = g_context.camera.get_view_matrix();
-        glm::mat4 projection = g_context.camera.get_projection_matrix(aspect_ratio);
+        // 创建 VAO
+        VertexArray vao;
 
-        shader.set_uniform("uModel", model);
-        shader.set_uniform("uView", view);
-        shader.set_uniform("uProjection", projection);
+        // 设置顶点缓冲区绑定 (binding index 0)
+        constexpr GLsizei stride = sizeof(Vertex);
+        vao.set_vertex_buffer(0, vbo, 0, stride);
 
-        // 绘制立方体
-        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+        // 设置位置属性 (attrib index 0)
+        vao.set_attribute(0, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, pos));
+        vao.enable_attribute(0);
 
-        glfwSwapBuffers(window);
+        // 设置颜色属性 (attrib index 1)
+        vao.set_attribute(1, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, color));
+        vao.enable_attribute(1);
+
+        // 绑定 VAO 和着色器
+        vao.bind();
+        shader.bind();
+
+        std::printf("\n=== 控制说明 ===\n");
+        std::printf("WASD: 移动\n");
+        std::printf("空格/Shift: 上升/下降\n");
+        std::printf("鼠标: 视角\n");
+        std::printf("滚轮: 缩放 FOV\n");
+        std::printf("F1: 切换鼠标捕获\n");
+        std::printf("ESC: 退出\n\n");
+
+        while (!glfwWindowShouldClose(window))
+        {
+            // 计算 delta time
+            float current_frame = static_cast<float>(glfwGetTime());
+            g_context.delta_time = current_frame - g_context.last_frame;
+            g_context.last_frame = current_frame;
+
+            process_input(window);
+            glfwPollEvents();
+
+            // 清除颜色和深度缓冲
+            glClearColor(0.2f, 0.4f, 0.8f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // 获取窗口尺寸
+            glfwGetFramebufferSize(window, &width, &height);
+            float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+
+            // 设置 MVP 矩阵
+            glm::mat4 model = glm::mat4(1.0f);
+            glm::mat4 view = g_context.camera.get_view_matrix();
+            glm::mat4 projection = g_context.camera.get_projection_matrix(aspect_ratio);
+
+            shader.set_uniform("uModel", model);
+            shader.set_uniform("uView", view);
+            shader.set_uniform("uProjection", projection);
+
+            // 绘制立方体
+            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+
+            glfwSwapBuffers(window);
+        }
+
+        // shader, vbo, vao 在此作用域结束时析构
+        // 它们的析构函数会在 glfwTerminate() 之前调用
     }
 
     // 清理回调以防止退出时段错误
