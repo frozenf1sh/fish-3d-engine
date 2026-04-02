@@ -8,6 +8,33 @@
 
 namespace fish::graphics {
 
+namespace {
+
+auto load_textures(std::string_view directory, const tinygltf::Model& gltf_model)
+    -> std::unordered_map<int, std::shared_ptr<Texture2D>>
+{
+    std::unordered_map<int, std::shared_ptr<Texture2D>> textures;
+
+    for (size_t i = 0; i < gltf_model.textures.size(); ++i) {
+        const auto& texture = gltf_model.textures[i];
+        const auto& image = gltf_model.images[texture.source];
+
+        std::filesystem::path tex_path = std::filesystem::path(directory) / image.uri;
+
+        auto tex_result = Texture2D::from_file(tex_path.string(), true);
+        if (tex_result) {
+            textures[static_cast<int>(i)] = std::make_shared<Texture2D>(std::move(*tex_result));
+        } else {
+            std::fprintf(stderr, "Warning: Failed to load texture %s: %s\n",
+                        tex_path.c_str(), tex_result.error().c_str());
+        }
+    }
+
+    return textures;
+}
+
+} // anonymous namespace
+
 auto Model::from_file(std::string_view path)
     -> std::expected<Model, std::string>
 {
@@ -164,29 +191,6 @@ auto Model::from_file(std::string_view path)
     }
 
     return model;
-}
-
-auto Model::load_textures(std::string_view directory, const tinygltf::Model& model)
-    -> std::unordered_map<int, std::shared_ptr<Texture2D>>
-{
-    std::unordered_map<int, std::shared_ptr<Texture2D>> textures;
-
-    for (size_t i = 0; i < model.textures.size(); ++i) {
-        const auto& texture = model.textures[i];
-        const auto& image = model.images[texture.source];
-
-        std::filesystem::path tex_path = std::filesystem::path(directory) / image.uri;
-
-        auto tex_result = Texture2D::from_file(tex_path.string(), true);
-        if (tex_result) {
-            textures[static_cast<int>(i)] = std::make_shared<Texture2D>(std::move(*tex_result));
-        } else {
-            std::fprintf(stderr, "Warning: Failed to load texture %s: %s\n",
-                        tex_path.c_str(), tex_result.error().c_str());
-        }
-    }
-
-    return textures;
 }
 
 void Model::draw() const

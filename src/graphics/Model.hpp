@@ -11,6 +11,11 @@
 #include "Mesh.hpp"
 #include "Texture2D.hpp"
 
+// Forward declaration
+namespace tinygltf {
+    class Model;
+}
+
 namespace fish::graphics {
 
 class Model {
@@ -25,9 +30,6 @@ public:
 
 private:
     Model() = default;
-
-    static auto load_textures(std::string_view directory, const tinygltf::Model& model)
-        -> std::unordered_map<int, std::shared_ptr<Texture2D>>;
 
     std::vector<Mesh> m_meshes;
     std::unordered_map<int, std::shared_ptr<Texture2D>> m_textures;
