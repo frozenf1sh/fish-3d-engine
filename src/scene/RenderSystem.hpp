@@ -6,6 +6,7 @@
 #include "graphics/Shader.hpp"
 #include "graphics/Framebuffer.hpp"
 #include "graphics/Camera.hpp"
+#include "Components.hpp"
 
 namespace fish::scene {
 

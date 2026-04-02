@@ -39,12 +39,11 @@ void glfw_error_callback(int error, const char *description) {
   std::fprintf(stderr, "GLFW Error [%d]: %s\n", error, description);
 }
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
+void framebuffer_size_callback(GLFWwindow*, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int action,
-                  int mods) {
+void key_callback(GLFWwindow *window, int key, int, int action, int) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
   }
@@ -56,19 +55,9 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action,
                      cursor_enabled ? GLFW_CURSOR_NORMAL
                                     : GLFW_CURSOR_DISABLED);
   }
-
-  // F5: 保存场景
-  if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
-    std::printf("Saving scene to scene.json...\n");
-  }
-
-  // F9: 加载场景
-  if (key == GLFW_KEY_F9 && action == GLFW_PRESS) {
-    std::printf("Loading scene from scene.json...\n");
-  }
 }
 
-void mouse_callback(GLFWwindow *window, double xpos_in, double ypos_in) {
+void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
   float xpos = static_cast<float>(xpos_in);
   float ypos = static_cast<float>(ypos_in);
 
@@ -87,7 +76,7 @@ void mouse_callback(GLFWwindow *window, double xpos_in, double ypos_in) {
   g_context.camera.process_mouse_movement(x_offset, y_offset);
 }
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+void scroll_callback(GLFWwindow*, double, double yoffset) {
   g_context.camera.process_mouse_scroll(static_cast<float>(yoffset));
 }
 
@@ -105,20 +94,6 @@ void process_input(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
     g_context.camera.process_keyboard(GLFW_KEY_LEFT_SHIFT,
                                       g_context.delta_time);
-}
-
-/// @brief 创建地板实体
-void create_floor_entity(entt::registry& registry) {
-  auto entity = registry.create();
-  registry.emplace<TagComponent>(entity, "Floor");
-
-  // 地板位置
-  auto& transform = registry.emplace<TransformComponent>(entity);
-  transform.position = glm::vec3(0.0f, -0.5f, 0.0f);
-
-  // 创建地板模型（简单的平面）
-  // 注意：这里我们用一个空模型，在 main 循环中单独处理地板
-  // 或者可以创建一个真正的地板 Model
 }
 
 /// @brief 创建狐狸实体
@@ -337,8 +312,7 @@ int main() {
     bool save_scene = false;
     bool load_scene = false;
 
-    while (!glfwSetWindowShouldClose(window, GLFW_FALSE),
-           !glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window)) {
       // 计算 delta time
       float current_frame = static_cast<float>(glfwGetTime());
       g_context.delta_time = current_frame - g_context.last_frame;

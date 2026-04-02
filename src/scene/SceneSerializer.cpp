@@ -7,36 +7,6 @@
 
 namespace fish::scene {
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    TransformComponent,
-    position,
-    rotation,
-    scale
-)
-
-// glm::quat 的序列化支持
-void to_json(nlohmann::json& j, const glm::quat& q) {
-    j = nlohmann::json{{"w", q.w}, {"x", q.x}, {"y", q.y}, {"z", q.z}};
-}
-
-void from_json(const nlohmann::json& j, glm::quat& q) {
-    j.at("w").get_to(q.w);
-    j.at("x").get_to(q.x);
-    j.at("y").get_to(q.y);
-    j.at("z").get_to(q.z);
-}
-
-// glm::vec3 的序列化支持
-void to_json(nlohmann::json& j, const glm::vec3& v) {
-    j = nlohmann::json{{"x", v.x}, {"y", v.y}, {"z", v.z}};
-}
-
-void from_json(const nlohmann::json& j, glm::vec3& v) {
-    j.at("x").get_to(v.x);
-    j.at("y").get_to(v.y);
-    j.at("z").get_to(v.z);
-}
-
 SceneSerializer::SceneSerializer(entt::registry& registry)
     : m_registry(registry)
 {
@@ -95,7 +65,22 @@ auto SceneSerializer::serialize_to_json() const -> nlohmann::json
         // TransformComponent
         if (m_registry.all_of<TransformComponent>(entity)) {
             const auto& transform = m_registry.get<TransformComponent>(entity);
-            entity_json["transform"] = transform;
+            entity_json["transform"]["position"] = {
+                {"x", transform.position.x},
+                {"y", transform.position.y},
+                {"z", transform.position.z}
+            };
+            entity_json["transform"]["rotation"] = {
+                {"w", transform.rotation.w},
+                {"x", transform.rotation.x},
+                {"y", transform.rotation.y},
+                {"z", transform.rotation.z}
+            };
+            entity_json["transform"]["scale"] = {
+                {"x", transform.scale.x},
+                {"y", transform.scale.y},
+                {"z", transform.scale.z}
+            };
         }
 
         // MeshComponent
@@ -107,8 +92,16 @@ auto SceneSerializer::serialize_to_json() const -> nlohmann::json
         // LightComponent
         if (m_registry.all_of<LightComponent>(entity)) {
             const auto& light = m_registry.get<LightComponent>(entity);
-            entity_json["light"]["color"] = light.color;
-            entity_json["light"]["direction"] = light.direction;
+            entity_json["light"]["color"] = {
+                {"x", light.color.x},
+                {"y", light.color.y},
+                {"z", light.color.z}
+            };
+            entity_json["light"]["direction"] = {
+                {"x", light.direction.x},
+                {"y", light.direction.y},
+                {"z", light.direction.z}
+            };
             entity_json["light"]["intensity"] = light.intensity;
         }
 
@@ -138,7 +131,22 @@ void SceneSerializer::deserialize_from_json(const nlohmann::json& json)
 
         // TransformComponent
         if (entity_json.contains("transform")) {
-            auto transform = entity_json["transform"].get<TransformComponent>();
+            const auto& transform_json = entity_json["transform"];
+            TransformComponent transform;
+
+            transform.position.x = transform_json["position"]["x"].get<float>();
+            transform.position.y = transform_json["position"]["y"].get<float>();
+            transform.position.z = transform_json["position"]["z"].get<float>();
+
+            transform.rotation.w = transform_json["rotation"]["w"].get<float>();
+            transform.rotation.x = transform_json["rotation"]["x"].get<float>();
+            transform.rotation.y = transform_json["rotation"]["y"].get<float>();
+            transform.rotation.z = transform_json["rotation"]["z"].get<float>();
+
+            transform.scale.x = transform_json["scale"]["x"].get<float>();
+            transform.scale.y = transform_json["scale"]["y"].get<float>();
+            transform.scale.z = transform_json["scale"]["z"].get<float>();
+
             m_registry.emplace<TransformComponent>(entity, std::move(transform));
         } else {
             // 默认 Transform
@@ -164,9 +172,17 @@ void SceneSerializer::deserialize_from_json(const nlohmann::json& json)
         if (entity_json.contains("light")) {
             const auto& light_json = entity_json["light"];
             LightComponent light;
-            light_json.at("color").get_to(light.color);
-            light_json.at("direction").get_to(light.direction);
-            light_json.at("intensity").get_to(light.intensity);
+
+            light.color.x = light_json["color"]["x"].get<float>();
+            light.color.y = light_json["color"]["y"].get<float>();
+            light.color.z = light_json["color"]["z"].get<float>();
+
+            light.direction.x = light_json["direction"]["x"].get<float>();
+            light.direction.y = light_json["direction"]["y"].get<float>();
+            light.direction.z = light_json["direction"]["z"].get<float>();
+
+            light.intensity = light_json["intensity"].get<float>();
+
             m_registry.emplace<LightComponent>(entity, std::move(light));
         }
     }

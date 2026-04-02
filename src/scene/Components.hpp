@@ -37,12 +37,12 @@ struct TransformComponent {
 
 /// @brief 网格组件 - 指向模型资源
 struct MeshComponent {
-    std::shared_ptr<Model> model;
+    std::shared_ptr<graphics::Model> model;
     std::string model_path; // 用于序列化
 
     MeshComponent() = default;
 
-    explicit MeshComponent(std::shared_ptr<Model> m, std::string path = "")
+    MeshComponent(std::shared_ptr<graphics::Model> m, std::string path)
         : model(std::move(m)), model_path(std::move(path)) {}
 };
 
