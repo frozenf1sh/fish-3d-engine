@@ -68,6 +68,7 @@ struct EditorContext {
   std::deque<LogMessage> log_messages;
   bool show_error_popup = false;
   std::string error_message;
+  bool uniform_scale = true;  // 是否等比例缩放
 
   void log(LogMessage::Type type, const std::string& msg) {
     log_messages.push_back({type, msg});
@@ -777,13 +778,31 @@ int main() {
 
                   // 提取文件名作为标签
                   std::filesystem::path fs_path(path);
-                  std::string name = fs_path.stem().string();
+                  std::string base_name = fs_path.stem().string();
+                  std::string unique_name = base_name;
 
-                  registry.emplace<TagComponent>(new_entity, name);
+                  // 检查名称是否重复，自动添加后缀
+                  int suffix = 2;
+                  bool name_conflict = true;
+                  while (name_conflict) {
+                    name_conflict = false;
+                    auto tag_view = registry.view<TagComponent>();
+                    for (auto entity : tag_view) {
+                      auto& tag = tag_view.get<TagComponent>(entity);
+                      if (tag.tag == unique_name) {
+                        name_conflict = true;
+                        unique_name = std::format("{} ({})", base_name, suffix);
+                        suffix++;
+                        break;
+                      }
+                    }
+                  }
+
+                  registry.emplace<TagComponent>(new_entity, unique_name);
                   registry.emplace<TransformComponent>(new_entity);
                   registry.emplace<MeshComponent>(new_entity, new_model, path);
 
-                  g_editor_context.log_info(std::format("Imported model: {}", name));
+                  g_editor_context.log_info(std::format("Imported model: {}", unique_name));
                 } else {
                   g_editor_context.log_error(std::format("Failed to load model: {}", model_result.error()));
                 }
@@ -915,15 +934,71 @@ int main() {
         // 显示并编辑 TransformComponent
         if (auto* transform = registry.try_get<TransformComponent>(selected)) {
           if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+            // Position - 支持键盘输入，自动验证
+            static glm::vec3 prev_pos = transform->position;
             ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
+            // 验证位置值，如有非法值则回滚
+            for (int i = 0; i < 3; ++i) {
+              if (!std::isfinite(transform->position[i])) {
+                transform->position[i] = prev_pos[i];
+              }
+            }
+            prev_pos = transform->position;
 
             // 使用欧拉角编辑旋转
             glm::vec3 euler = glm::degrees(transform->get_rotation_euler());
-            if (ImGui::DragFloat3("Rotation", &euler.x, 1.0f, -180.0f, 180.0f)) {
-              transform->set_rotation_euler(glm::radians(euler));
+            static glm::vec3 prev_euler = euler;
+            if (ImGui::DragFloat3("Rotation", &euler.x, 1.0f, -360.0f, 360.0f)) {
+              // 验证旋转值，如有非法值则回滚
+              bool valid = true;
+              for (int i = 0; i < 3; ++i) {
+                if (!std::isfinite(euler[i])) {
+                  valid = false;
+                  break;
+                }
+              }
+              if (valid) {
+                transform->set_rotation_euler(glm::radians(euler));
+                prev_euler = euler;
+              } else {
+                euler = prev_euler;
+              }
             }
 
-            ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f, 0.01f, 10.0f);
+            // Scale - 支持等比例缩放
+            ImGui::Checkbox("Uniform Scale", &g_editor_context.uniform_scale);
+            if (g_editor_context.uniform_scale) {
+              // 等比例缩放
+              static float uniform_scale_val = transform->scale.x;
+              // 当选中新实体时同步值
+              if (g_editor_context.selected_entity != selected) {
+                uniform_scale_val = transform->scale.x;
+              }
+              if (ImGui::DragFloat("Scale", &uniform_scale_val, 0.1f, 0.01f, 1000.0f)) {
+                if (std::isfinite(uniform_scale_val) && uniform_scale_val > 0.001f) {
+                  transform->scale = glm::vec3(uniform_scale_val);
+                } else {
+                  uniform_scale_val = transform->scale.x;
+                }
+              }
+            } else {
+              // 独立轴缩放
+              static glm::vec3 prev_scale = transform->scale;
+              ImGui::DragFloat3("Scale", &transform->scale.x, 0.1f, 0.01f, 1000.0f);
+              // 验证缩放值，如有非法值则回滚
+              bool scale_valid = true;
+              for (int i = 0; i < 3; ++i) {
+                if (!std::isfinite(transform->scale[i]) || transform->scale[i] < 0.001f) {
+                  scale_valid = false;
+                  break;
+                }
+              }
+              if (!scale_valid) {
+                transform->scale = prev_scale;
+              } else {
+                prev_scale = transform->scale;
+              }
+            }
           }
         }
 
