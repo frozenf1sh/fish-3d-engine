@@ -234,7 +234,7 @@ int main()
             // 设置 MVP 矩阵 - 简单的变换，让模型在视野中
             glm::mat4 model_matrix = glm::mat4(1.0f);
             model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, 0.0f, 0.0f));
-            model_matrix = glm::scale(model_matrix, glm::vec3(1.0f));
+            model_matrix = glm::scale(model_matrix, glm::vec3(0.01f));
 
             glm::mat4 view_matrix = g_context.camera.get_view_matrix();
             glm::mat4 projection_matrix = g_context.camera.get_projection_matrix(aspect_ratio);
