@@ -6,6 +6,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -33,7 +37,104 @@ struct Context {
   float delta_time = 0.0f;
   float last_frame = 0.0f;
   GLFWwindow *window = nullptr;
+  bool imgui_wants_mouse = false;
+  bool imgui_wants_keyboard = false;
 } g_context;
+
+// ImGui 暗黑主题
+void set_imgui_dark_theme() {
+  ImGuiStyle& style = ImGui::GetStyle();
+
+  // 窗口圆角
+  style.WindowRounding = 8.0f;
+  style.FrameRounding = 4.0f;
+  style.GrabRounding = 4.0f;
+  style.PopupRounding = 4.0f;
+  style.ScrollbarRounding = 4.0f;
+  style.TabRounding = 4.0f;
+
+  // 颜色主题 - 现代暗黑
+  ImVec4* colors = style.Colors;
+  colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+  colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+  colors[ImGuiCol_WindowBg]               = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+  colors[ImGuiCol_ChildBg]                = ImVec4(0.05f, 0.05f, 0.05f, 0.00f);
+  colors[ImGuiCol_PopupBg]                = ImVec4(0.12f, 0.12f, 0.12f, 0.98f);
+  colors[ImGuiCol_Border]                 = ImVec4(0.28f, 0.28f, 0.28f, 0.30f);
+  colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+  colors[ImGuiCol_FrameBg]                = ImVec4(0.18f, 0.18f, 0.18f, 1.00f);
+  colors[ImGuiCol_FrameBgHovered]         = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+  colors[ImGuiCol_FrameBgActive]          = ImVec4(0.30f, 0.30f, 0.30f, 1.00f);
+  colors[ImGuiCol_TitleBg]                = ImVec4(0.06f, 0.06f, 0.06f, 1.00f);
+  colors[ImGuiCol_TitleBgActive]           = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
+  colors[ImGuiCol_TitleBgCollapsed]        = ImVec4(0.00f, 0.00f, 0.00f, 0.51f);
+  colors[ImGuiCol_MenuBarBg]              = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+  colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+  colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
+  colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+  colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+  colors[ImGuiCol_CheckMark]              = ImVec4(0.80f, 0.80f, 0.80f, 0.31f);
+  colors[ImGuiCol_SliderGrab]             = ImVec4(0.48f, 0.48f, 0.48f, 1.00f);
+  colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.68f, 0.68f, 0.68f, 1.00f);
+  colors[ImGuiCol_Button]                 = ImVec4(0.30f, 0.30f, 0.30f, 0.80f);
+  colors[ImGuiCol_ButtonHovered]          = ImVec4(0.40f, 0.40f, 0.40f, 0.80f);
+  colors[ImGuiCol_ButtonActive]           = ImVec4(0.50f, 0.50f, 0.50f, 0.80f);
+  colors[ImGuiCol_Header]                 = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+  colors[ImGuiCol_HeaderHovered]          = ImVec4(0.32f, 0.32f, 0.32f, 1.00f);
+  colors[ImGuiCol_HeaderActive]           = ImVec4(0.42f, 0.42f, 0.42f, 1.00f);
+  colors[ImGuiCol_Separator]              = ImVec4(0.28f, 0.28f, 0.28f, 0.30f);
+  colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.55f, 0.55f, 0.55f, 0.30f);
+  colors[ImGuiCol_SeparatorActive]        = ImVec4(0.70f, 0.70f, 0.70f, 0.30f);
+  colors[ImGuiCol_ResizeGrip]             = ImVec4(0.28f, 0.28f, 0.28f, 0.00f);
+  colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.55f, 0.55f, 0.55f, 0.30f);
+  colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.70f, 0.70f, 0.70f, 0.30f);
+  colors[ImGuiCol_Tab]                    = ImVec4(0.18f, 0.18f, 0.18f, 0.86f);
+  colors[ImGuiCol_TabHovered]             = ImVec4(0.38f, 0.38f, 0.38f, 0.86f);
+  colors[ImGuiCol_TabActive]              = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
+  colors[ImGuiCol_TabUnfocused]           = ImVec4(0.12f, 0.12f, 0.12f, 0.97f);
+  colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+  colors[ImGuiCol_DockingPreview]         = ImVec4(0.50f, 0.50f, 0.50f, 0.70f);
+  colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+  colors[ImGuiCol_PlotLines]              = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
+  colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+  colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+  colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+  colors[ImGuiCol_TableHeaderBg]          = ImVec4(0.19f, 0.19f, 0.20f, 1.00f);
+  colors[ImGuiCol_TableBorderStrong]      = ImVec4(0.31f, 0.31f, 0.35f, 1.00f);
+  colors[ImGuiCol_TableBorderLight]       = ImVec4(0.23f, 0.23f, 0.25f, 1.00f);
+  colors[ImGuiCol_TableRowBg]             = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+  colors[ImGuiCol_TableRowBgAlt]          = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+  colors[ImGuiCol_TextSelectedBg]         = ImVec4(0.40f, 0.40f, 0.40f, 0.50f);
+  colors[ImGuiCol_DragDropTarget]         = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
+  colors[ImGuiCol_NavHighlight]           = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+  colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+  colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+  colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+}
+
+// 初始化 ImGui
+void init_imgui(GLFWwindow* window) {
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO(); (void)io;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+  // 设置现代暗黑主题
+  set_imgui_dark_theme();
+
+  // 初始化 ImGui GLFW 和 OpenGL3 绑定
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init("#version 460");
+}
+
+// 关闭 ImGui
+void shutdown_imgui() {
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+}
 
 void glfw_error_callback(int error, const char *description) {
   std::fprintf(stderr, "GLFW Error [%d]: %s\n", error, description);
@@ -44,6 +145,10 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height) {
 }
 
 void key_callback(GLFWwindow *window, int key, int, int action, int) {
+  if (g_context.imgui_wants_keyboard) {
+    return;
+  }
+
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
   }
@@ -58,6 +163,10 @@ void key_callback(GLFWwindow *window, int key, int, int action, int) {
 }
 
 void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
+  if (g_context.imgui_wants_mouse) {
+    return;
+  }
+
   float xpos = static_cast<float>(xpos_in);
   float ypos = static_cast<float>(ypos_in);
 
@@ -77,10 +186,17 @@ void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
 }
 
 void scroll_callback(GLFWwindow*, double, double yoffset) {
+  if (g_context.imgui_wants_mouse) {
+    return;
+  }
   g_context.camera.process_mouse_scroll(static_cast<float>(yoffset));
 }
 
 void process_input(GLFWwindow *window) {
+  if (g_context.imgui_wants_keyboard) {
+    return;
+  }
+
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     g_context.camera.process_keyboard(GLFW_KEY_W, g_context.delta_time);
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -223,6 +339,22 @@ int main() {
     std::printf("Shadow map created: %dx%d\n", SHADOW_WIDTH, SHADOW_HEIGHT);
 
     //======================================================================
+    // 3.5. 创建场景渲染 FBO
+    //======================================================================
+
+    unsigned int scene_width = 1280;
+    unsigned int scene_height = 720;
+    auto scene_fbo = Framebuffer::create_color_depth(scene_width, scene_height);
+    std::printf("Scene framebuffer created: %dx%d\n", scene_width, scene_height);
+
+    //======================================================================
+    // 4. 初始化 ImGui
+    //======================================================================
+
+    init_imgui(window);
+    std::printf("ImGui initialized\n");
+
+    //======================================================================
     // 4. 加载模型和创建场景
     //======================================================================
 
@@ -307,10 +439,15 @@ int main() {
     std::printf("- Entt ECS 系统\n");
     std::printf("- Scene Serialization (JSON)\n");
     std::printf("- Directional Shadow Mapping\n");
-    std::printf("- PCF Soft Shadows\n\n");
+    std::printf("- PCF Soft Shadows\n");
+    std::printf("- ImGui Editor\n\n");
 
     bool save_scene = false;
     bool load_scene = false;
+
+    // 视口尺寸
+    ImVec2 viewport_size(0, 0);
+    bool viewport_size_changed = false;
 
     while (!glfwWindowShouldClose(window)) {
       // 计算 delta time
@@ -404,21 +541,30 @@ int main() {
       shadow_fbo.unbind();
 
       //==================================================================
-      // Pass 2: Lighting Pass（光照渲染 Pass）
+      // Pass 2: Scene Pass（渲染到场景 FBO）
       //==================================================================
 
-      glfwGetFramebufferSize(window, &width, &height);
-      glViewport(0, 0, width, height);
+      // 检查视口尺寸是否变化
+      if (viewport_size_changed && viewport_size.x > 0 && viewport_size.y > 0) {
+        scene_fbo.resize(static_cast<unsigned int>(viewport_size.x),
+                        static_cast<unsigned int>(viewport_size.y));
+        viewport_size_changed = false;
+      }
 
+      // 渲染到场景 FBO
+      scene_fbo.bind();
+      glViewport(0, 0, scene_fbo.width(), scene_fbo.height());
       glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       shader.bind();
 
       // 设置 VP 矩阵
-      float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+      float scene_aspect_ratio = static_cast<float>(scene_fbo.width()) /
+                                static_cast<float>(scene_fbo.height());
       glm::mat4 view_matrix = g_context.camera.get_view_matrix();
-      glm::mat4 projection_matrix = g_context.camera.get_projection_matrix(aspect_ratio);
+      glm::mat4 projection_matrix =
+          g_context.camera.get_projection_matrix(scene_aspect_ratio);
 
       shader.set_uniform("uView", view_matrix);
       shader.set_uniform("uProjection", projection_matrix);
@@ -435,7 +581,7 @@ int main() {
       shader.set_uniform("uShadowMap", 1);
 
       // 使用 RenderSystem 渲染 ECS 实体
-      RenderSystem::render(registry, shader, g_context.camera, aspect_ratio);
+      RenderSystem::render(registry, shader, g_context.camera, scene_aspect_ratio);
 
       // 绘制地板
       shader.set_uniform("uModel", floor_model_matrix);
@@ -448,9 +594,120 @@ int main() {
       glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(floor_indices.size()),
                      GL_UNSIGNED_INT, nullptr);
 
+      scene_fbo.unbind();
+
+      //==================================================================
+      // Pass 3: ImGui Pass（编辑器界面）
+      //==================================================================
+
+      // 开始 ImGui 帧
+      ImGui_ImplOpenGL3_NewFrame();
+      ImGui_ImplGlfw_NewFrame();
+      ImGui::NewFrame();
+
+      // 更新 ImGui 输入状态
+      ImGuiIO& io = ImGui::GetIO();
+      g_context.imgui_wants_mouse = io.WantCaptureMouse;
+      g_context.imgui_wants_keyboard = io.WantCaptureKeyboard;
+
+      // 创建全屏 DockSpace
+      ImGuiWindowFlags window_flags =
+          ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+      ImGuiViewport* viewport = ImGui::GetMainViewport();
+      ImGui::SetNextWindowPos(viewport->WorkPos);
+      ImGui::SetNextWindowSize(viewport->WorkSize);
+      ImGui::SetNextWindowViewport(viewport->ID);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+      window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+      ImGui::Begin("Fish Engine Editor DockSpace", nullptr, window_flags);
+      ImGui::PopStyleVar(2);
+
+      // 菜单栏
+      if (ImGui::BeginMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+          if (ImGui::MenuItem("Save Scene", "F5")) {
+            serializer.serialize("scene.json");
+          }
+          if (ImGui::MenuItem("Load Scene", "F9")) {
+            if (std::filesystem::exists("scene.json")) {
+              serializer.deserialize("scene.json");
+            }
+          }
+          ImGui::Separator();
+          if (ImGui::MenuItem("Exit", "ESC")) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+          }
+          ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+      }
+
+      // DockSpace
+      ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+      ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+
+      ImGui::End();
+
+      // Scene Viewport 窗口
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+      ImGui::Begin("Scene Viewport");
+
+      // 获取窗口内容区域大小
+      ImVec2 avail_size = ImGui::GetContentRegionAvail();
+      if (avail_size.x != viewport_size.x || avail_size.y != viewport_size.y) {
+        viewport_size = avail_size;
+        viewport_size_changed = true;
+      }
+
+      // 显示场景纹理
+      if (scene_fbo.has_color_attachment()) {
+        ImTextureID tex_id = (ImTextureID)(intptr_t)scene_fbo.color_texture_id();
+        // 翻转 Y 轴（OpenGL 纹理坐标与 ImGui 不同）
+        ImGui::Image(tex_id, avail_size, ImVec2(0, 1), ImVec2(1, 0));
+      }
+
+      ImGui::End();
+      ImGui::PopStyleVar();
+
+      // Properties 窗口
+      ImGui::Begin("Properties");
+      ImGui::Text("Entities: %zu",
+                  static_cast<size_t>(std::distance(registry.view<entt::entity>().begin(),
+                                                    registry.view<entt::entity>().end())));
+      ImGui::Separator();
+      ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)",
+                  g_context.camera.get_position().x,
+                  g_context.camera.get_position().y,
+                  g_context.camera.get_position().z);
+      ImGui::End();
+
+      // Render ImGui
+      ImGui::Render();
+      int display_w, display_h;
+      glfwGetFramebufferSize(window, &display_w, &display_h);
+      glViewport(0, 0, display_w, display_h);
+      glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT);
+      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+      // 更新和渲染额外的视口
+      if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        GLFWwindow* backup_current_context = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_current_context);
+      }
+
       // 交换缓冲区
       glfwSwapBuffers(window);
     }
+
+    // 清理 ImGui
+    shutdown_imgui();
   }
 
   // 清理回调以防止退出时段错误

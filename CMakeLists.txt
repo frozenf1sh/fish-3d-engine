@@ -12,6 +12,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(EnTT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # tinygltf is header-only
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
@@ -52,6 +53,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     EnTT::EnTT
     nlohmann_json::nlohmann_json
+    imgui::imgui
 )
 
 if(MSVC)
