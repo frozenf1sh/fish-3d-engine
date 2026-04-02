@@ -4,6 +4,10 @@
 #include <array>
 #include <filesystem>
 #include <format>
+#include <deque>
+#include <string>
+
+#include <portable-file-dialogs.h>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -51,9 +55,34 @@ struct Context {
   bool game_running = false;  // 游戏是否在运行（鼠标捕获状态）
 } g_context;
 
+// 日志消息
+struct LogMessage {
+  enum class Type { Info, Warning, Error };
+  Type type;
+  std::string message;
+};
+
 // 编辑器状态
 struct EditorContext {
   entt::entity selected_entity = entt::null;
+  std::deque<LogMessage> log_messages;
+  bool show_error_popup = false;
+  std::string error_message;
+
+  void log(LogMessage::Type type, const std::string& msg) {
+    log_messages.push_back({type, msg});
+    if (log_messages.size() > 100) {
+      log_messages.pop_front();
+    }
+  }
+
+  void log_info(const std::string& msg) { log(LogMessage::Type::Info, msg); }
+  void log_warning(const std::string& msg) { log(LogMessage::Type::Warning, msg); }
+  void log_error(const std::string& msg) {
+    log(LogMessage::Type::Error, msg);
+    show_error_popup = true;
+    error_message = msg;
+  }
 } g_editor_context;
 
 // ImGui 暗黑主题
@@ -710,12 +739,57 @@ int main() {
       // 菜单栏
       if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
-          if (ImGui::MenuItem("Save Scene", "F5")) {
-            serializer.serialize("scene.json");
+          if (ImGui::MenuItem("Save Scene...")) {
+            auto selection = pfd::save_file("Save Scene", "", {"JSON Files", "*.json"}).result();
+            if (!selection.empty()) {
+              if (serializer.serialize(selection)) {
+                g_editor_context.log_info(std::format("Saved scene to: {}", selection));
+              } else {
+                g_editor_context.log_error(std::format("Failed to save scene to: {}", selection));
+              }
+            }
           }
-          if (ImGui::MenuItem("Load Scene", "F9")) {
-            if (std::filesystem::exists("scene.json")) {
-              serializer.deserialize("scene.json");
+          if (ImGui::MenuItem("Load Scene...")) {
+            auto selection = pfd::open_file("Load Scene", "", {"JSON Files", "*.json"}).result();
+            if (!selection.empty()) {
+              std::string path = selection[0];
+              if (std::filesystem::exists(path)) {
+                if (serializer.deserialize(path)) {
+                  g_editor_context.log_info(std::format("Loaded scene from: {}", path));
+                } else {
+                  g_editor_context.log_error(std::format("Failed to load scene from: {}", path));
+                }
+              } else {
+                g_editor_context.log_error(std::format("File not found: {}", path));
+              }
+            }
+          }
+          ImGui::Separator();
+          if (ImGui::MenuItem("Import Model...")) {
+            auto selection = pfd::open_file("Import Model", "", {"GLTF Files", "*.gltf *.glb"}).result();
+            if (!selection.empty()) {
+              std::string path = selection[0];
+              try {
+                auto model_result = Model::from_file(path);
+                if (model_result) {
+                  auto new_model = std::make_shared<Model>(std::move(*model_result));
+                  auto new_entity = registry.create();
+
+                  // 提取文件名作为标签
+                  std::filesystem::path fs_path(path);
+                  std::string name = fs_path.stem().string();
+
+                  registry.emplace<TagComponent>(new_entity, name);
+                  registry.emplace<TransformComponent>(new_entity);
+                  registry.emplace<MeshComponent>(new_entity, new_model, path);
+
+                  g_editor_context.log_info(std::format("Imported model: {}", name));
+                } else {
+                  g_editor_context.log_error(std::format("Failed to load model: {}", model_result.error()));
+                }
+              } catch (const std::exception& e) {
+                g_editor_context.log_error(std::format("Exception importing model: {}", e.what()));
+              }
             }
           }
           ImGui::Separator();
@@ -898,22 +972,55 @@ int main() {
 
       ImGui::End();
 
-      // Debug 窗口 - 显示在底部
+      // Error Popup
+      if (g_editor_context.show_error_popup) {
+        ImGui::OpenPopup("Error");
+        g_editor_context.show_error_popup = false;
+      }
+      if (ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Error:");
+        ImGui::Separator();
+        ImGui::TextWrapped("%s", g_editor_context.error_message.c_str());
+        ImGui::Separator();
+        if (ImGui::Button("OK", ImVec2(120, 0))) {
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+      }
+
+      // Console 面板 - 显示在底部
       if (first_run) {
         first_run = false;
-        // 设置 Debug 窗口默认位置在底部
+        // 设置 Console 窗口默认位置在底部
         ImGuiViewport* main_viewport = ImGui::GetMainViewport();
         ImVec2 work_size = main_viewport->WorkSize;
         ImVec2 work_pos = main_viewport->WorkPos;
         ImGui::SetNextWindowPos(ImVec2(work_pos.x, work_pos.y + work_size.y * 0.75f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(work_size.x, work_size.y * 0.25f), ImGuiCond_FirstUseEver);
       }
-      ImGui::Begin("Debug");
-      ImGui::Text("ImGui Debug Window");
-      ImGui::Separator();
+      ImGui::Begin("Console");
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                   1000.0f / ImGui::GetIO().Framerate,
                   ImGui::GetIO().Framerate);
+      ImGui::Separator();
+
+      ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+      for (const auto& msg : g_editor_context.log_messages) {
+        ImVec4 color;
+        switch (msg.type) {
+          case LogMessage::Type::Info: color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); break;
+          case LogMessage::Type::Warning: color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); break;
+          case LogMessage::Type::Error: color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); break;
+        }
+        ImGui::TextColored(color, "%s", msg.message.c_str());
+      }
+
+      // 自动滚动到底部
+      if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+        ImGui::SetScrollHereY(1.0f);
+      }
+      ImGui::EndChild();
+
       ImGui::End();
 
       // Render ImGui

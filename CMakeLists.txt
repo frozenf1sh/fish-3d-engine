@@ -14,6 +14,9 @@ find_package(EnTT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
+# portable-file-dialogs is header-only
+find_path(PORTABLE_FILE_DIALOGS_INCLUDE_DIRS "portable-file-dialogs.h" REQUIRED)
+
 # tinygltf is header-only
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
 
@@ -38,6 +41,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src
     ${TINYGLTF_INCLUDE_DIRS}
     ${Stb_INCLUDE_DIR}
+    ${PORTABLE_FILE_DIALOGS_INCLUDE_DIRS}
 )
 
 # 复制资源目录到构建目录
