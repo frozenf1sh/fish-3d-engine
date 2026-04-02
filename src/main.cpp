@@ -305,7 +305,7 @@ int main() {
     // 方向光 - 从上方打下来，能看到阴影投射到地面
     glm::vec3 light_pos = glm::vec3(5.0f, 12.0f, 5.0f);
     glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 light_dir = glm::normalize(light_target - light_pos);
+    glm::vec3 light_dir = glm::normalize(light_pos - light_target); // 注意：这里是从目标指向光源！
     glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
 
     //======================================================================
@@ -437,6 +437,8 @@ int main() {
       floor_model = glm::translate(floor_model, glm::vec3(0.0f, -0.5f, 0.0f));
       shader.set_uniform("uModel", floor_model);
       shader.set_uniform("uBaseColor", glm::vec3(0.6f, 0.6f, 0.6f));
+      shader.set_uniform("uMetallic", 0.0f);
+      shader.set_uniform("uRoughness", 1.0f);
       shader.set_uniform("uHasTexture", false);
 
       floor_vao.bind();
