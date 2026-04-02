@@ -19,7 +19,7 @@ using namespace fish::graphics;
 
 // 全局状态
 struct Context {
-    Camera camera{glm::vec3(0.0f, 0.5f, 3.0f)};
+    Camera camera{glm::vec3(0.0f, 1.0f, 5.0f)};
     bool first_mouse = true;
     float last_x = 400.0f;
     float last_y = 300.0f;
@@ -224,18 +224,17 @@ int main()
             glfwPollEvents();
 
             // 清除颜色和深度缓冲
-            glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+            glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // 获取窗口尺寸
             glfwGetFramebufferSize(window, &width, &height);
             float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
-            // 设置 MVP 矩阵
+            // 设置 MVP 矩阵 - 简单的变换，让模型在视野中
             glm::mat4 model_matrix = glm::mat4(1.0f);
-            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, -0.5f, 0.0f));
-            model_matrix = glm::scale(model_matrix, glm::vec3(0.5f));
-            model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, 0.0f, 0.0f));
+            model_matrix = glm::scale(model_matrix, glm::vec3(1.0f));
 
             glm::mat4 view_matrix = g_context.camera.get_view_matrix();
             glm::mat4 projection_matrix = g_context.camera.get_projection_matrix(aspect_ratio);

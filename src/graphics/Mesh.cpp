@@ -42,7 +42,13 @@ void Mesh::draw() const
         m_material.base_color_texture->bind(0);
     }
 
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, nullptr);
+    // 确保我们有索引数据
+    if (!m_indices.empty()) {
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_indices.size()), GL_UNSIGNED_INT, nullptr);
+    } else {
+        // 回退到无索引绘制
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_vertices.size()));
+    }
 }
 
 } // namespace fish::graphics

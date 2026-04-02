@@ -20,6 +20,12 @@ void main()
 {
     vec3 base_color = uHasTexture ? texture(uBaseColorTexture, TexCoord).rgb : uBaseColor;
 
+    // 如果没有纹理，输出纯色以便调试
+    if (!uHasTexture) {
+        FragColor = vec4(base_color, 1.0);
+        return;
+    }
+
     // Ambient
     float ambient_strength = 0.15;
     vec3 ambient = ambient_strength * uLightColor * base_color;
