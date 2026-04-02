@@ -29,6 +29,13 @@
 using namespace fish::graphics;
 using namespace fish::scene;
 
+// 窗口状态
+struct WindowState {
+  int x = 100, y = 100;
+  int width = 1600, height = 900;
+  bool is_fullscreen = false;
+} g_window_state;
+
 // 全局状态
 struct Context {
   Camera camera{glm::vec3(0.0f, 2.0f, 6.0f)};
@@ -153,13 +160,37 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height) {
 }
 
 void key_callback(GLFWwindow *window, int key, int, int action, int) {
-  // F1 和 ESC 始终响应，不受 ImGui 捕获限制
+  // F1, F11 和 ESC 始终响应，不受 ImGui 捕获限制
   if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
     g_context.game_running = !g_context.game_running;
     glfwSetInputMode(window, GLFW_CURSOR,
                      g_context.game_running ? GLFW_CURSOR_DISABLED
                                             : GLFW_CURSOR_NORMAL);
     g_context.first_mouse = true;  // 重置鼠标状态
+  }
+
+  if (key == GLFW_KEY_F11 && action == GLFW_PRESS) {
+    // 切换全屏/窗口模式
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+    if (g_window_state.is_fullscreen) {
+      // 切换回窗口模式
+      glfwSetWindowMonitor(window, nullptr,
+                           g_window_state.x, g_window_state.y,
+                           g_window_state.width, g_window_state.height,
+                           GLFW_DONT_CARE);
+      g_window_state.is_fullscreen = false;
+    } else {
+      // 保存当前窗口位置和大小
+      glfwGetWindowPos(window, &g_window_state.x, &g_window_state.y);
+      glfwGetWindowSize(window, &g_window_state.width, &g_window_state.height);
+      // 切换到全屏
+      glfwSetWindowMonitor(window, monitor,
+                           0, 0, mode->width, mode->height,
+                           mode->refreshRate);
+      g_window_state.is_fullscreen = true;
+    }
   }
 
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -173,8 +204,8 @@ void key_callback(GLFWwindow *window, int key, int, int action, int) {
     }
   }
 
-  // 其他按键只有在游戏运行且 ImGui 不捕获时才处理
-  if (g_context.imgui_wants_keyboard || !g_context.game_running) {
+  // 其他按键只有在游戏运行时才处理
+  if (!g_context.game_running) {
     return;
   }
 }
@@ -294,14 +325,11 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+  glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);  // 启动时最大化
 
-  // 获取主显示器
-  GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-  const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-
-  // 全屏窗口
+  // 创建窗口（窗口化全屏）
   GLFWwindow *window = glfwCreateWindow(
-      mode->width, mode->height, "Fish Engine - ECS Architecture", monitor, nullptr);
+      1600, 900, "Fish Engine - ECS Architecture", nullptr, nullptr);
 
   if (!window) {
     std::fprintf(stderr, "Failed to create GLFW window!\n");
@@ -489,13 +517,12 @@ int main() {
     bool save_scene = false;
     bool load_scene = false;
 
-    // 获取窗口尺寸
-    int window_width, window_height;
-    glfwGetWindowSize(window, &window_width, &window_height);
-
     // 视口尺寸
     ImVec2 viewport_size(0, 0);
     bool viewport_size_changed = false;
+
+    // 是否第一次运行
+    bool first_run = true;
 
     while (!glfwWindowShouldClose(window)) {
       // 计算 delta time
@@ -774,6 +801,24 @@ int main() {
       ImGui::BulletText("ESC: Exit game mode / Quit");
       ImGui::BulletText("WASD: Move camera");
       ImGui::BulletText("Mouse: Look around");
+      ImGui::End();
+
+      // Debug 窗口 - 显示在底部
+      if (first_run) {
+        first_run = false;
+        // 设置 Debug 窗口默认位置在底部
+        ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+        ImVec2 work_size = main_viewport->WorkSize;
+        ImVec2 work_pos = main_viewport->WorkPos;
+        ImGui::SetNextWindowPos(ImVec2(work_pos.x, work_pos.y + work_size.y * 0.75f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(work_size.x, work_size.y * 0.25f), ImGuiCond_FirstUseEver);
+      }
+      ImGui::Begin("Debug");
+      ImGui::Text("ImGui Debug Window");
+      ImGui::Separator();
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                  1000.0f / ImGui::GetIO().Framerate,
+                  ImGui::GetIO().Framerate);
       ImGui::End();
 
       // Render ImGui
