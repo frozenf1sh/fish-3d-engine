@@ -180,7 +180,8 @@ void key_callback(GLFWwindow *window, int key, int, int action, int) {
 }
 
 void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in) {
-  if (g_context.imgui_wants_mouse || !g_context.game_running) {
+  // 只有在游戏模式下才处理鼠标移动
+  if (!g_context.game_running) {
     return;
   }
 
@@ -191,33 +192,47 @@ void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in) {
     g_context.last_x = xpos;
     g_context.last_y = ypos;
     g_context.first_mouse = false;
+    // 第一次回调后重置到中心
+    int win_width, win_height;
+    glfwGetWindowSize(window, &win_width, &win_height);
+    double center_x = static_cast<double>(win_width) / 2.0;
+    double center_y = static_cast<double>(win_height) / 2.0;
+    glfwSetCursorPos(window, center_x, center_y);
+    g_context.last_x = static_cast<float>(center_x);
+    g_context.last_y = static_cast<float>(center_y);
     return;
   }
 
   // 计算鼠标移动偏移
-  int win_width, win_height;
-  glfwGetWindowSize(window, &win_width, &win_height);
-  float center_x = static_cast<float>(win_width) / 2.0f;
-  float center_y = static_cast<float>(win_height) / 2.0f;
+  float x_offset = xpos - g_context.last_x;
+  float y_offset = g_context.last_y - ypos;
 
-  float x_offset = xpos - center_x;
-  float y_offset = center_y - ypos;
-
-  // 只有当偏移足够大时才处理，减少抖动
-  if (std::abs(x_offset) > 0.1f || std::abs(y_offset) > 0.1f) {
+  // 处理相机移动
+  if (std::abs(x_offset) > 0.001f || std::abs(y_offset) > 0.001f) {
     g_context.camera.process_mouse_movement(x_offset, y_offset);
   }
+
+  // 重置鼠标到中心
+  int win_width, win_height;
+  glfwGetWindowSize(window, &win_width, &win_height);
+  double center_x = static_cast<double>(win_width) / 2.0;
+  double center_y = static_cast<double>(win_height) / 2.0;
+  glfwSetCursorPos(window, center_x, center_y);
+  g_context.last_x = static_cast<float>(center_x);
+  g_context.last_y = static_cast<float>(center_y);
 }
 
 void scroll_callback(GLFWwindow*, double, double yoffset) {
-  if (g_context.imgui_wants_mouse || !g_context.game_running) {
+  // 只有在游戏模式下才处理滚轮
+  if (!g_context.game_running) {
     return;
   }
   g_context.camera.process_mouse_scroll(static_cast<float>(yoffset));
 }
 
 void process_input(GLFWwindow *window) {
-  if (g_context.imgui_wants_keyboard || !g_context.game_running) {
+  // 只有在游戏模式下才处理游戏输入，忽略 ImGui 的捕获
+  if (!g_context.game_running) {
     return;
   }
 
@@ -488,18 +503,9 @@ int main() {
       g_context.delta_time = current_frame - g_context.last_frame;
       g_context.last_frame = current_frame;
 
-      // 如果在游戏模式下，强制鼠标在窗口中心
-      if (g_context.game_running) {
-        double center_x = static_cast<double>(window_width) / 2.0;
-        double center_y = static_cast<double>(window_height) / 2.0;
-        glfwSetCursorPos(window, center_x, center_y);
-        // 更新 last_x, last_y 为中心位置
-        g_context.last_x = static_cast<float>(center_x);
-        g_context.last_y = static_cast<float>(center_y);
-      }
-
-      process_input(window);
+      // 处理输入（先轮询事件）
       glfwPollEvents();
+      process_input(window);
 
       // 检查场景保存/加载
       if (glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS && !save_scene) {
