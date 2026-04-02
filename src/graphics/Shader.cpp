@@ -94,6 +94,54 @@ auto Shader::id() const -> GLuint
     return m_id;
 }
 
+void Shader::set_uniform(std::string_view name, int value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniform1i(m_id, location, value);
+}
+
+void Shader::set_uniform(std::string_view name, float value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniform1f(m_id, location, value);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::vec2& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniform2fv(m_id, location, 1, &value[0]);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::vec3& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniform3fv(m_id, location, 1, &value[0]);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::vec4& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniform4fv(m_id, location, 1, &value[0]);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::mat2& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniformMatrix2fv(m_id, location, 1, GL_FALSE, &value[0][0]);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::mat3& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniformMatrix3fv(m_id, location, 1, GL_FALSE, &value[0][0]);
+}
+
+void Shader::set_uniform(std::string_view name, const glm::mat4& value) const
+{
+    GLint location = glGetUniformLocation(m_id, name.data());
+    glProgramUniformMatrix4fv(m_id, location, 1, GL_FALSE, &value[0][0]);
+}
+
 auto Shader::compile_shader(GLenum type, std::string_view source)
     -> std::expected<GLuint, std::string>
 {

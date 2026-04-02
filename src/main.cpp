@@ -10,6 +10,7 @@
 #include "graphics/Shader.hpp"
 #include "graphics/Buffer.hpp"
 #include "graphics/VertexArray.hpp"
+#include "graphics/Camera.hpp"
 
 using namespace fish::graphics;
 
@@ -17,6 +18,16 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
 };
+
+// 全局状态
+struct Context {
+    Camera camera;
+    bool first_mouse = true;
+    float last_x = 400.0f;
+    float last_y = 300.0f;
+    float delta_time = 0.0f;
+    float last_frame = 0.0f;
+} g_context;
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -29,6 +40,56 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+
+    if (key == GLFW_KEY_F1 && action == GLFW_PRESS)
+    {
+        static bool cursor_enabled = false;
+        cursor_enabled = !cursor_enabled;
+        glfwSetInputMode(window, GLFW_CURSOR,
+                         cursor_enabled ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    }
+}
+
+void mouse_callback(GLFWwindow* window, double xpos_in, double ypos_in)
+{
+    float xpos = static_cast<float>(xpos_in);
+    float ypos = static_cast<float>(ypos_in);
+
+    if (g_context.first_mouse)
+    {
+        g_context.last_x = xpos;
+        g_context.last_y = ypos;
+        g_context.first_mouse = false;
+    }
+
+    float x_offset = xpos - g_context.last_x;
+    float y_offset = g_context.last_y - ypos;
+
+    g_context.last_x = xpos;
+    g_context.last_y = ypos;
+
+    g_context.camera.process_mouse_movement(x_offset, y_offset);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    g_context.camera.process_mouse_scroll(static_cast<float>(yoffset));
+}
+
+void process_input(GLFWwindow* window)
+{
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_W, g_context.delta_time);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_S, g_context.delta_time);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_A, g_context.delta_time);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_D, g_context.delta_time);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_SPACE, g_context.delta_time);
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        g_context.camera.process_keyboard(GLFW_KEY_LEFT_SHIFT, g_context.delta_time);
 }
 
 int main()
@@ -50,7 +111,7 @@ int main()
 
     GLFWwindow* window = glfwCreateWindow(
         800, 600,
-        "Fish Engine",
+        "Fish Engine - 3D Cube",
         nullptr, nullptr
     );
 
@@ -62,6 +123,12 @@ int main()
     }
 
     glfwSetKeyCallback(window, key_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    // 隐藏并捕获鼠标
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
@@ -78,10 +145,13 @@ int main()
     std::printf("Vendor: %s\n", glGetString(GL_VENDOR));
     std::printf("GLSL Version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 
+    // 开启深度测试
+    glEnable(GL_DEPTH_TEST);
+
     // 创建着色器
     auto shader_result = Shader::from_file(
-        "assets/shaders/triangle.vert",
-        "assets/shaders/triangle.frag"
+        "assets/shaders/cube.vert",
+        "assets/shaders/cube.frag"
     );
     if (!shader_result) {
         std::fprintf(stderr, "%s\n", shader_result.error().c_str());
@@ -91,11 +161,50 @@ int main()
     }
     auto shader = std::move(*shader_result);
 
-    // 三角形顶点数据
+    // 立方体顶点数据（带颜色）
     const std::array vertices = {
-        Vertex{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-        Vertex{ {  0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-        Vertex{ {  0.0f,  0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
+        // 前面
+        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+        // 后面
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        // 上面
+        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+        // 下面
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        // 右面
+        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+        Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
+        Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+        Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
+        // 左面
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
+        Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
+        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+        Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
+        Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
+        Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
     };
 
     // 创建顶点缓冲区
@@ -120,14 +229,44 @@ int main()
     vao.bind();
     shader.bind();
 
+    std::printf("\n=== 控制说明 ===\n");
+    std::printf("WASD: 移动\n");
+    std::printf("空格/Shift: 上升/下降\n");
+    std::printf("鼠标: 视角\n");
+    std::printf("滚轮: 缩放 FOV\n");
+    std::printf("F1: 切换鼠标捕获\n");
+    std::printf("ESC: 退出\n\n");
+
     while (!glfwWindowShouldClose(window))
     {
+        // 计算 delta time
+        float current_frame = static_cast<float>(glfwGetTime());
+        g_context.delta_time = current_frame - g_context.last_frame;
+        g_context.last_frame = current_frame;
+
+        process_input(window);
         glfwPollEvents();
 
+        // 清除颜色和深度缓冲
         glClearColor(0.2f, 0.4f, 0.8f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        // 获取窗口尺寸
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
+
+        // 设置 MVP 矩阵
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = g_context.camera.get_view_matrix();
+        glm::mat4 projection = g_context.camera.get_projection_matrix(aspect_ratio);
+
+        shader.set_uniform("uModel", model);
+        shader.set_uniform("uView", view);
+        shader.set_uniform("uProjection", projection);
+
+        // 绘制立方体
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
 
         glfwSwapBuffers(window);
     }

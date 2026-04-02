@@ -16,6 +16,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Shader.cpp
     src/graphics/Buffer.cpp
     src/graphics/VertexArray.cpp
+    src/graphics/Camera.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

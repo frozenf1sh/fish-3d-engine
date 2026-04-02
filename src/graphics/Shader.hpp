@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include <glad/glad.h>
+#include <glm/glm.hpp>
 
 namespace fish::graphics {
 
@@ -26,6 +27,15 @@ public:
 
     void bind() const;
     [[nodiscard]] auto id() const -> GLuint;
+
+    void set_uniform(std::string_view name, int value) const;
+    void set_uniform(std::string_view name, float value) const;
+    void set_uniform(std::string_view name, const glm::vec2& value) const;
+    void set_uniform(std::string_view name, const glm::vec3& value) const;
+    void set_uniform(std::string_view name, const glm::vec4& value) const;
+    void set_uniform(std::string_view name, const glm::mat2& value) const;
+    void set_uniform(std::string_view name, const glm::mat3& value) const;
+    void set_uniform(std::string_view name, const glm::mat4& value) const;
 
 private:
     Shader() = default;
