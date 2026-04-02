@@ -1,0 +1,16 @@
+{
+  "name": "fish-engine",
+  "version": "0.1.0",
+  "description": "A modern C++ 3D graphics engine",
+  "dependencies": [
+    {
+      "name": "glfw3"
+    },
+    {
+      "name": "glad"
+    },
+    {
+      "name": "glm"
+    }
+  ]
+}

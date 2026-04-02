@@ -1,41 +1,27 @@
-# Prerequisites
-*.d
+# Build directories
+build/
+out/
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+.cache
 
 # Executables
+fish-engine
 *.exe
 *.out
-*.app
 
-# debug information files
-*.dwo
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.claude/
+CLAUDE.md
+
+# vcpkg
+vcpkg_installed/
