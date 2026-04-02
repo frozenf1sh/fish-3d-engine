@@ -39,6 +39,9 @@ struct Context {
   GLFWwindow *window = nullptr;
   bool imgui_wants_mouse = false;
   bool imgui_wants_keyboard = false;
+  bool game_running = false;  // 游戏是否在运行（鼠标捕获状态）
+  bool scene_viewport_hovered = false;  // 鼠标是否悬停在视口上
+  bool scene_viewport_focused = false;  // 视口是否有焦点
 } g_context;
 
 // ImGui 暗黑主题
@@ -145,25 +148,34 @@ void framebuffer_size_callback(GLFWwindow*, int width, int height) {
 }
 
 void key_callback(GLFWwindow *window, int key, int, int action, int) {
-  if (g_context.imgui_wants_keyboard) {
-    return;
+  // F1 和 ESC 始终响应，不受 ImGui 捕获限制
+  if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
+    g_context.game_running = !g_context.game_running;
+    glfwSetInputMode(window, GLFW_CURSOR,
+                     g_context.game_running ? GLFW_CURSOR_DISABLED
+                                            : GLFW_CURSOR_NORMAL);
+    g_context.first_mouse = true;  // 重置鼠标状态
   }
 
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
+    if (g_context.game_running) {
+      // ESC 在游戏模式下释放鼠标
+      g_context.game_running = false;
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else {
+      // 在编辑模式下退出程序
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
   }
 
-  if (key == GLFW_KEY_F1 && action == GLFW_PRESS) {
-    static bool cursor_enabled = false;
-    cursor_enabled = !cursor_enabled;
-    glfwSetInputMode(window, GLFW_CURSOR,
-                     cursor_enabled ? GLFW_CURSOR_NORMAL
-                                    : GLFW_CURSOR_DISABLED);
+  // 其他按键只有在游戏运行且 ImGui 不捕获时才处理
+  if (g_context.imgui_wants_keyboard || !g_context.game_running) {
+    return;
   }
 }
 
 void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
-  if (g_context.imgui_wants_mouse) {
+  if (g_context.imgui_wants_mouse || !g_context.game_running) {
     return;
   }
 
@@ -186,14 +198,14 @@ void mouse_callback(GLFWwindow*, double xpos_in, double ypos_in) {
 }
 
 void scroll_callback(GLFWwindow*, double, double yoffset) {
-  if (g_context.imgui_wants_mouse) {
+  if (g_context.imgui_wants_mouse || !g_context.game_running) {
     return;
   }
   g_context.camera.process_mouse_scroll(static_cast<float>(yoffset));
 }
 
 void process_input(GLFWwindow *window) {
-  if (g_context.imgui_wants_keyboard) {
+  if (g_context.imgui_wants_keyboard || !g_context.game_running) {
     return;
   }
 
@@ -272,8 +284,8 @@ int main() {
   glfwSetScrollCallback(window, scroll_callback);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-  // 隐藏并捕获鼠标
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  // 默认显示鼠标（编辑模式）
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
@@ -652,9 +664,44 @@ int main() {
 
       ImGui::End();
 
+      // 工具栏
+      ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+      if (g_context.game_running) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.9f, 0.3f, 0.3f, 1.0f));
+        if (ImGui::Button("Stop")) {
+          g_context.game_running = false;
+          glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+        ImGui::PopStyleColor(2);
+      } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.9f, 0.3f, 1.0f));
+        if (ImGui::Button("Play")) {
+          g_context.game_running = true;
+          g_context.first_mouse = true;
+          glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+        ImGui::PopStyleColor(2);
+      }
+      ImGui::SameLine();
+      ImGui::Text(g_context.game_running ? "Mode: Game" : "Mode: Edit");
+      ImGui::End();
+
       // Scene Viewport 窗口
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("Scene Viewport");
+
+      // 更新视口悬停和焦点状态
+      g_context.scene_viewport_hovered = ImGui::IsWindowHovered();
+      g_context.scene_viewport_focused = ImGui::IsWindowFocused();
+
+      // 点击视口且不在游戏模式时进入游戏模式
+      if (g_context.scene_viewport_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !g_context.game_running) {
+        g_context.game_running = true;
+        g_context.first_mouse = true;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      }
 
       // 获取窗口内容区域大小
       ImVec2 avail_size = ImGui::GetContentRegionAvail();
@@ -683,6 +730,13 @@ int main() {
                   g_context.camera.get_position().x,
                   g_context.camera.get_position().y,
                   g_context.camera.get_position().z);
+      ImGui::Separator();
+      ImGui::Text("Controls:");
+      ImGui::BulletText("Click Play or click viewport to enter game mode");
+      ImGui::BulletText("F1: Toggle game/edit mode");
+      ImGui::BulletText("ESC: Exit game mode / Quit");
+      ImGui::BulletText("WASD: Move camera");
+      ImGui::BulletText("Mouse: Look around");
       ImGui::End();
 
       // Render ImGui
