@@ -317,7 +317,7 @@ int main()
         //======================================================================
 
         // 方向光 - 从上方打下来，能看到阴影投射到地面
-        glm::vec3 light_pos = glm::vec3(5.0f, 8.0f, 5.0f);
+        glm::vec3 light_pos = glm::vec3(5.0f, 12.0f, 5.0f);
         glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::vec3 light_dir = glm::normalize(light_target - light_pos);
         glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -382,7 +382,7 @@ int main()
 
             // 狐狸模型矩阵 - 向下移动到地面
             glm::mat4 model_matrix = glm::mat4(1.0f);
-            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, -0.35f, 0.0f));
+            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, -0.45f, 0.0f));
             model_matrix = glm::scale(model_matrix, glm::vec3(0.01f));
 
             // 1.6 绘制场景（狐狸 + 地板）到阴影贴图
