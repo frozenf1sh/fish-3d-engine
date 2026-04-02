@@ -20,23 +20,13 @@ out vec4 FragColor;
 
 void main()
 {
-    // 先尝试显示纹理，如果没有就用基色
-    vec3 base_color = uHasTexture ? texture(uBaseColorTexture, TexCoord).rgb : uBaseColor;
+    // 测试1：先显示纹理，不做任何光照
+    if (uHasTexture) {
+        FragColor = texture(uBaseColorTexture, TexCoord);
+    } else {
+        FragColor = vec4(uBaseColor, 1.0);
+    }
 
-    // 简单的漫反射光照，让我们看到明暗变化
-    vec3 norm = normalize(Normal);
-    vec3 light_dir = normalize(uLightDir);
-
-    float diff = max(dot(norm, light_dir), 0.0);
-    vec3 diffuse = diff * uLightColor * base_color;
-
-    // 加一点环境光
-    vec3 ambient = 0.2 * base_color;
-
-    vec3 result = ambient + diffuse;
-
-    // Gamma 校正
-    result = pow(result, vec3(1.0 / 2.2));
-
-    FragColor = vec4(result, 1.0);
+    // 测试2：再试试显示光源方向作为颜色
+    // FragColor = vec4(abs(uLightDir) * 0.5 + 0.5, 1.0);
 }
