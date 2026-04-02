@@ -307,7 +307,7 @@ int main()
         //======================================================================
 
         // 方向光 - 从这个位置看向原点
-        glm::vec3 light_pos = glm::vec3(8.0f, 10.0f, 5.0f);
+        glm::vec3 light_pos = glm::vec3(3.0f, 4.0f, 2.0f);
         glm::vec3 light_target = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::vec3 light_dir = glm::normalize(light_target - light_pos);
         glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
