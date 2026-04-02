@@ -27,11 +27,17 @@ struct Context {
     float last_y = 300.0f;
     float delta_time = 0.0f;
     float last_frame = 0.0f;
+    GLFWwindow* window = nullptr;
 } g_context;
 
 void glfw_error_callback(int error, const char* description)
 {
     std::fprintf(stderr, "GLFW Error [%d]: %s\n", error, description);
+}
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -122,9 +128,12 @@ int main()
         return EXIT_FAILURE;
     }
 
+    g_context.window = window;
+
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // 隐藏并捕获鼠标
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -139,6 +148,11 @@ int main()
         glfwTerminate();
         return EXIT_FAILURE;
     }
+
+    // 设置初始视口
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    glViewport(0, 0, width, height);
 
     std::printf("OpenGL Version: %s\n", glGetString(GL_VERSION));
     std::printf("Renderer: %s\n", glGetString(GL_RENDERER));
@@ -252,7 +266,6 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // 获取窗口尺寸
-        int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
@@ -270,6 +283,12 @@ int main()
 
         glfwSwapBuffers(window);
     }
+
+    // 清理回调以防止退出时段错误
+    glfwSetKeyCallback(window, nullptr);
+    glfwSetCursorPosCallback(window, nullptr);
+    glfwSetScrollCallback(window, nullptr);
+    glfwSetFramebufferSizeCallback(window, nullptr);
 
     glfwDestroyWindow(window);
     glfwTerminate();
