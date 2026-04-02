@@ -132,12 +132,11 @@ void main()
     float spec = pow(max(dot(norm, halfway_dir), 0.0), 32.0);
     vec3 specular = specular_strength * spec * uLightColor;
 
-    // 计算阴影
-    vec4 frag_pos_light_space = uLightSpaceMatrix * vec4(FragPos, 1.0);
-    float shadow = calculate_shadow_pcf(frag_pos_light_space, norm, light_dir);
+    // 先禁用阴影，调试光照
+    float shadow = 0.0;
 
-    // 最终颜色：阴影部分只保留环境光
-    vec3 result = ambient + (1.0 - shadow) * (diffuse + specular);
+    // 最终颜色：暂时不使用阴影
+    vec3 result = ambient + diffuse + specular;
 
     // Gamma 校正
     result = pow(result, vec3(1.0 / 2.2));
