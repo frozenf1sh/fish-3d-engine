@@ -10,6 +10,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(tinygltf CONFIG REQUIRED)
+find_package(Stb CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
@@ -17,6 +19,9 @@ add_executable(${PROJECT_NAME}
     src/graphics/Buffer.cpp
     src/graphics/VertexArray.cpp
     src/graphics/Camera.cpp
+    src/graphics/Texture2D.cpp
+    src/graphics/Mesh.cpp
+    src/graphics/Model.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -34,6 +39,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     glad::glad
     glm::glm
+    tinygltf::tinygltf
+    Stb::Stb
 )
 
 if(MSVC)

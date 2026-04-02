@@ -11,6 +11,12 @@
     },
     {
       "name": "glm"
+    },
+    {
+      "name": "tinygltf"
+    },
+    {
+      "name": "stb"
     }
   ]
 }

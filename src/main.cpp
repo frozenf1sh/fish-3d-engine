@@ -6,22 +6,20 @@
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "graphics/Shader.hpp"
 #include "graphics/Buffer.hpp"
 #include "graphics/VertexArray.hpp"
 #include "graphics/Camera.hpp"
+#include "graphics/Model.hpp"
+#include "graphics/Texture2D.hpp"
 
 using namespace fish::graphics;
 
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color;
-};
-
 // 全局状态
 struct Context {
-    Camera camera;
+    Camera camera{glm::vec3(0.0f, 0.5f, 3.0f)};
     bool first_mouse = true;
     float last_x = 400.0f;
     float last_y = 300.0f;
@@ -117,7 +115,7 @@ int main()
 
     GLFWwindow* window = glfwCreateWindow(
         800, 600,
-        "Fish Engine - 3D Cube",
+        "Fish Engine - 3D Model",
         nullptr, nullptr
     );
 
@@ -164,12 +162,11 @@ int main()
 
     {
         // 作用域块：所有 OpenGL 资源在此作用域内创建和销毁
-        // 确保在 glfwTerminate() 之前析构
 
         // 创建着色器
         auto shader_result = Shader::from_file(
-            "assets/shaders/cube.vert",
-            "assets/shaders/cube.frag"
+            "assets/shaders/model.vert",
+            "assets/shaders/model.frag"
         );
         if (!shader_result) {
             std::fprintf(stderr, "%s\n", shader_result.error().c_str());
@@ -184,73 +181,29 @@ int main()
         }
         auto shader = std::move(*shader_result);
 
-        // 立方体顶点数据（带颜色）
-        const std::array vertices = {
-            // 前面
-            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-            // 后面
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-            // 上面
-            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-            // 下面
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-            // 右面
-            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-            Vertex{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 1.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } },
-            Vertex{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-            Vertex{ {  0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, 0.5f } },
-            // 左面
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-            Vertex{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f } },
-            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-            Vertex{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f } },
-            Vertex{ { -0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f } },
-            Vertex{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f } },
-        };
+        // 加载模型
+        std::printf("Loading model...\n");
+        auto model_result = Model::from_file("assets/models/Fox.gltf");
+        if (!model_result) {
+            std::fprintf(stderr, "%s\n", model_result.error().c_str());
+            // 清理回调
+            glfwSetKeyCallback(window, nullptr);
+            glfwSetCursorPosCallback(window, nullptr);
+            glfwSetScrollCallback(window, nullptr);
+            glfwSetFramebufferSizeCallback(window, nullptr);
+            glfwDestroyWindow(window);
+            glfwTerminate();
+            return EXIT_FAILURE;
+        }
+        auto model = std::move(*model_result);
+        std::printf("Model loaded! %zu meshes\n", model.get_meshes().size());
 
-        // 创建顶点缓冲区
-        auto vbo = Buffer::create(BufferType::Vertex, vertices.data(), vertices.size());
-
-        // 创建 VAO
-        VertexArray vao;
-
-        // 设置顶点缓冲区绑定 (binding index 0)
-        constexpr GLsizei stride = sizeof(Vertex);
-        vao.set_vertex_buffer(0, vbo, 0, stride);
-
-        // 设置位置属性 (attrib index 0)
-        vao.set_attribute(0, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, pos));
-        vao.enable_attribute(0);
-
-        // 设置颜色属性 (attrib index 1)
-        vao.set_attribute(1, 0, AttributeType::Float, 3, GL_FALSE, offsetof(Vertex, color));
-        vao.enable_attribute(1);
-
-        // 绑定 VAO 和着色器
-        vao.bind();
+        // 绑定着色器
         shader.bind();
+
+        // 设置光照参数
+        glm::vec3 light_pos = glm::vec3(2.0f, 2.0f, 2.0f);
+        glm::vec3 light_color = glm::vec3(1.0f, 1.0f, 1.0f);
 
         std::printf("\n=== 控制说明 ===\n");
         std::printf("WASD: 移动\n");
@@ -271,7 +224,7 @@ int main()
             glfwPollEvents();
 
             // 清除颜色和深度缓冲
-            glClearColor(0.2f, 0.4f, 0.8f, 1.0f);
+            glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // 获取窗口尺寸
@@ -279,22 +232,38 @@ int main()
             float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
             // 设置 MVP 矩阵
-            glm::mat4 model = glm::mat4(1.0f);
-            glm::mat4 view = g_context.camera.get_view_matrix();
-            glm::mat4 projection = g_context.camera.get_projection_matrix(aspect_ratio);
+            glm::mat4 model_matrix = glm::mat4(1.0f);
+            model_matrix = glm::translate(model_matrix, glm::vec3(0.0f, -0.5f, 0.0f));
+            model_matrix = glm::scale(model_matrix, glm::vec3(0.5f));
+            model_matrix = glm::rotate(model_matrix, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-            shader.set_uniform("uModel", model);
-            shader.set_uniform("uView", view);
-            shader.set_uniform("uProjection", projection);
+            glm::mat4 view_matrix = g_context.camera.get_view_matrix();
+            glm::mat4 projection_matrix = g_context.camera.get_projection_matrix(aspect_ratio);
 
-            // 绘制立方体
-            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+            shader.set_uniform("uModel", model_matrix);
+            shader.set_uniform("uView", view_matrix);
+            shader.set_uniform("uProjection", projection_matrix);
+
+            // 设置光照
+            shader.set_uniform("uLightPos", light_pos);
+            shader.set_uniform("uViewPos", g_context.camera.get_position());
+            shader.set_uniform("uLightColor", light_color);
+
+            // 绘制模型
+            for (const auto& mesh : model.get_meshes()) {
+                const auto& material = mesh.get_material();
+                shader.set_uniform("uBaseColor", material.base_color);
+                shader.set_uniform("uMetallic", material.metallic);
+                shader.set_uniform("uRoughness", material.roughness);
+                shader.set_uniform("uHasTexture", material.base_color_texture != nullptr);
+
+                mesh.draw();
+            }
 
             glfwSwapBuffers(window);
         }
 
-        // shader, vbo, vao 在此作用域结束时析构
-        // 它们的析构函数会在 glfwTerminate() 之前调用
+        // shader 和 model 在此作用域结束时析构
     }
 
     // 清理回调以防止退出时段错误
