@@ -23,6 +23,7 @@ fish-engine
 .claude/
 CLAUDE.md
 .clangd
+.clang-format
 
 # vcpkg
 vcpkg_installed/
