@@ -10,8 +10,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(tinygltf CONFIG REQUIRED)
-find_package(Stb CONFIG REQUIRED)
+
+# tinygltf is header-only
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
+
+# stb
+find_package(Stb REQUIRED)
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
@@ -26,6 +30,8 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src
+    ${TINYGLTF_INCLUDE_DIRS}
+    ${Stb_INCLUDE_DIR}
 )
 
 # 复制资源目录到构建目录
@@ -39,8 +45,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     glad::glad
     glm::glm
-    tinygltf::tinygltf
-    Stb::Stb
 )
 
 if(MSVC)
