@@ -26,6 +26,7 @@ add_executable(${PROJECT_NAME}
     src/graphics/Texture2D.cpp
     src/graphics/Mesh.cpp
     src/graphics/Model.cpp
+    src/graphics/Framebuffer.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
