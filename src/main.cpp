@@ -48,8 +48,6 @@ struct Context {
   bool imgui_wants_mouse = false;
   bool imgui_wants_keyboard = false;
   bool game_running = false;  // 游戏是否在运行（鼠标捕获状态）
-  bool scene_viewport_hovered = false;  // 鼠标是否悬停在视口上
-  bool scene_viewport_focused = false;  // 视口是否有焦点
 } g_context;
 
 // ImGui 暗黑主题
@@ -130,7 +128,8 @@ void init_imgui(GLFWwindow* window) {
   ImGuiIO& io = ImGui::GetIO(); (void)io;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  // 禁用独立视口，让所有窗口都在主窗口内
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
   // 大幅增加字体大小 - 使用默认字体并缩放
   io.Fonts->AddFontDefault();
@@ -756,17 +755,6 @@ int main() {
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
       ImGui::Begin("Scene Viewport");
 
-      // 更新视口悬停和焦点状态
-      g_context.scene_viewport_hovered = ImGui::IsWindowHovered();
-      g_context.scene_viewport_focused = ImGui::IsWindowFocused();
-
-      // 点击视口且不在游戏模式时进入游戏模式
-      if (g_context.scene_viewport_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !g_context.game_running) {
-        g_context.game_running = true;
-        g_context.first_mouse = true;
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-      }
-
       // 获取窗口内容区域大小
       ImVec2 avail_size = ImGui::GetContentRegionAvail();
       if (avail_size.x != viewport_size.x || avail_size.y != viewport_size.y) {
@@ -829,14 +817,6 @@ int main() {
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-      // 更新和渲染额外的视口
-      if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        GLFWwindow* backup_current_context = glfwGetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_current_context);
-      }
 
       // 交换缓冲区
       glfwSwapBuffers(window);
