@@ -261,6 +261,16 @@ int main()
         }
         auto model = std::move(*model_result);
         std::printf("Model loaded! %zu meshes\n", model.get_meshes().size());
+        for (size_t i = 0; i < model.get_meshes().size(); ++i) {
+            const auto& mesh = model.get_meshes()[i];
+            std::printf("  Mesh %zu: %zu vertices, %zu indices, has texture: %s\n",
+                       i, mesh.get_vertex_count(), mesh.get_index_count(),
+                       mesh.get_material().base_color_texture ? "yes" : "no");
+            if (mesh.get_vertex_count() > 0) {
+                // 检查第一个顶点的法线是否非零
+                const auto& v = mesh.get_material(); // 只是为了获取顶点结构体类型 - 需要用不同的方式
+            }
+        }
 
         // 创建地板平面顶点数据
         struct FloorVertex {

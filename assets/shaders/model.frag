@@ -23,9 +23,22 @@ void main()
     // 先获取纹理颜色
     vec3 base_color = uHasTexture ? texture(uBaseColorTexture, TexCoord).rgb : uBaseColor;
 
+    // 调试1：直接输出法线作为颜色
+    FragColor = vec4(abs(Normal) * 0.5 + 0.5, 1.0);
+    return;
+
+    // 调试2：直接输出光源方向
+    // FragColor = vec4(abs(uLightDir) * 0.5 + 0.5, 1.0);
+    // return;
+
     // 简单漫反射光照
     vec3 norm = normalize(Normal);
     vec3 light_dir = normalize(uLightDir);
+
+    // 调试3：输出漫反射因子
+    // float diff = max(dot(norm, light_dir), 0.0);
+    // FragColor = vec4(diff, diff, diff, 1.0);
+    // return;
 
     // 漫反射
     float diff = max(dot(norm, light_dir), 0.0);
