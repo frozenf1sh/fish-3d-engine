@@ -23,45 +23,51 @@ find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h" REQUIRED)
 # stb
 find_package(Stb REQUIRED)
 
-add_executable(${PROJECT_NAME}
-    src/main.cpp
-    src/graphics/Shader.cpp
-    src/graphics/Buffer.cpp
-    src/graphics/VertexArray.cpp
-    src/graphics/Camera.cpp
-    src/graphics/Texture2D.cpp
-    src/graphics/Mesh.cpp
-    src/graphics/Model.cpp
-    src/graphics/Framebuffer.cpp
-    src/scene/RenderSystem.cpp
-    src/scene/SceneSerializer.cpp
-)
+add_executable(
+  ${PROJECT_NAME}
+  src/main.cpp
+  src/graphics/Shader.cpp
+  src/graphics/Buffer.cpp
+  src/graphics/VertexArray.cpp
+  src/graphics/Camera.cpp
+  src/graphics/Texture2D.cpp
+  src/graphics/Mesh.cpp
+  src/graphics/Model.cpp
+  src/graphics/Framebuffer.cpp
+  src/scene/RenderSystem.cpp
+  src/scene/SceneSerializer.cpp)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${PROJECT_SOURCE_DIR}/src
-    ${TINYGLTF_INCLUDE_DIRS}
-    ${Stb_INCLUDE_DIR}
-    ${PORTABLE_FILE_DIALOGS_INCLUDE_DIRS}
-)
+target_include_directories(
+  ${PROJECT_NAME}
+  PRIVATE ${PROJECT_SOURCE_DIR}/src ${TINYGLTF_INCLUDE_DIRS} ${Stb_INCLUDE_DIR}
+          ${PORTABLE_FILE_DIALOGS_INCLUDE_DIRS})
 
 # 复制资源目录到构建目录
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/assets
-    $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
-)
+add_custom_command(
+  TARGET ${PROJECT_NAME}
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/assets
+          $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    glfw
-    glad::glad
-    glm::glm
-    EnTT::EnTT
-    nlohmann_json::nlohmann_json
-    imgui::imgui
-)
+target_link_libraries(
+  ${PROJECT_NAME} PRIVATE glfw glad::glad glm::glm EnTT::EnTT
+                          nlohmann_json::nlohmann_json imgui::imgui)
 
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4)
 else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# 打包配置 (Install Rules)
+install(
+  TARGETS ${PROJECT_NAME}
+  RUNTIME DESTINATION .
+  BUNDLE DESTINATION .)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets/ DESTINATION assets)
+
+install(
+  FILES ${PROJECT_SOURCE_DIR}/imgui.ini
+  DESTINATION .
+  OPTIONAL)
