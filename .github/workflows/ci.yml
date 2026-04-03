@@ -6,28 +6,31 @@ on:
   pull_request:
     branches: [ main ]
 
-# 优化 1：并发控制。如果在旧构建完成前推送了新提交，自动取消旧构建。
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# 优化 2：权限最小化
 permissions:
   contents: read
 
 jobs:
   build:
-    # 优化 3：引入矩阵构建 (Matrix)，为未来跨平台(Windows/macOS)做准备
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # 一个平台失败不影响另一个平台
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest] # 如需Windows，只需添加 windows-latest
+        # 增加 Windows 支持，并为不同平台指定 Vcpkg 架构
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+          - os: windows-latest
+            triplet: x64-windows-static # 强制 Windows 使用静态链接，消除 DLL 依赖
 
     env:
       BUILD_TYPE: Debug
-      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite" # 优化 4：启用 Vcpkg Github Actions 二进制缓存
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.triplet }} # 告诉 vcpkg 使用哪个架构
 
     steps:
     - name: Checkout code
@@ -35,47 +38,33 @@ jobs:
       with:
         submodules: recursive
 
-    # 优化 5：跨平台依赖安装。仅在 Linux 下安装 apt 依赖
     - name: Install System Dependencies (Linux)
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          build-essential cmake ninja-build \
-          xorg-dev libx11-dev libxrandr-dev libxinerama-dev \
-          libxcursor-dev libxi-dev mesa-common-dev libgl1-mesa-dev
+        sudo apt-get install -y build-essential cmake ninja-build xorg-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libgl1-mesa-dev
 
-    # 优化 6：引入 CCache/SCCache，极大加速 C++ 二次编译速度
     - name: Setup Ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ matrix.os }}-ccache-${{ github.ref }}
-        restore-keys: |
-          ${{ matrix.os }}-ccache-
+        variant: sccache # 在跨平台特别是 Windows 环境下，sccache 兼容性更好
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       id: runvcpkg
       with:
-        # 使用你原本的 Commit ID
-        vcpkgGitCommitId: 'a42af01b72c28a8e6d4e18e4c4cb89e84e57ef9a' 
+        vcpkgGitCommitId: 'd5462800eb2cda3d06f9edf50893f570355570d9'
         vcpkgJsonGlob: 'vcpkg.json'
 
-    # 优化 7：将 CCache 挂载到 CMake 中
     - name: Configure CMake
+      shell: bash
       run: |
-        cmake -B build \
-          -G Ninja \
+        cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake \
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_TOOLCHAIN_FILE="${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake" \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
-
-    # 优化 8：工业级项目必须有自动化测试（即使现在没写，也要把位置留出来）
-    - name: Run Tests
-      working-directory: ${{ github.workspace }}/build
-      run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
-      continue-on-error: true # 目前暂且允许失败，有测试用例后去掉此行
