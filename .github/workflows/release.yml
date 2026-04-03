@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # 发布 Release 必须的权限
+
+jobs:
+  build-release:
+    name: Build Release on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # 预留了跨平台打包的逻辑
+        include:
+          - os: ubuntu-latest
+            artifact_name: linux
+            executable_name: fish-engine
+          # - os: windows-latest
+          #   artifact_name: windows
+          #   executable_name: fish-engine.exe
+
+    env:
+      BUILD_TYPE: Release
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install System Dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build xorg-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev mesa-common-dev libgl1-mesa-dev
+
+    - name: Setup Ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ matrix.os }}-ccache-release-${{ github.ref }}
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      id: runvcpkg
+      with:
+        vcpkgGitCommitId: 'a42af01b72c28a8e6d4e18e4c4cb89e84e57ef9a'
+        vcpkgJsonGlob: 'vcpkg.json'
+
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+    # 优化 9：跨平台兼容的打包脚本 (统一使用 bash 避免 Windows/Linux 路径问题)
+    - name: Package build artifacts
+      shell: bash
+      run: |
+        mkdir -p artifacts/assets
+        # 处理不同操作系统的可执行文件名称差异
+        cp build/${{ matrix.executable_name }} artifacts/
+        if [ -d "assets" ]; then cp -r assets/* artifacts/assets/; fi
+        cd artifacts
+        tar -czf ../fish-engine-${{ github.ref_name }}-${{ matrix.artifact_name }}.tar.gz .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifact-${{ matrix.artifact_name }}
+        path: fish-engine-${{ github.ref_name }}-${{ matrix.artifact_name }}.tar.gz
+        retention-days: 5 # 优化 10：节省云端存储空间
+
+  create-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-artifacts
+        pattern: release-artifact-*
+        merge-multiple: true # 优化 11：将所有平台的产物下载到同一目录
+
+    - name: Display downloaded artifacts
+      run: ls -la release-artifacts/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2 # 优化 12：升级到 v2
+      with:
+        files: release-artifacts/*.tar.gz
+        generate_release_notes: true
+        draft: false
+        prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
