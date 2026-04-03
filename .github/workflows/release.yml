@@ -6,26 +6,30 @@ on:
       - 'v*'
 
 permissions:
-  contents: write # 发布 Release 必须的权限
+  contents: write
 
 jobs:
   build-release:
-    name: Build Release on ${{ matrix.os }}
+    name: Release on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # 预留了跨平台打包的逻辑
         include:
           - os: ubuntu-latest
+            triplet: x64-linux
             artifact_name: linux
-            executable_name: fish-engine
-          # - os: windows-latest
-          #   artifact_name: windows
-          #   executable_name: fish-engine.exe
+            archive_cmd: tar -czf ../fish-engine-${{ github.ref_name }}-linux.tar.gz .
+            artifact_file: fish-engine-${{ github.ref_name }}-linux.tar.gz
+          - os: windows-latest
+            triplet: x64-windows-static # 静态链接！解决找不到 dll 的核心！
+            artifact_name: windows
+            archive_cmd: 7z a ../fish-engine-${{ github.ref_name }}-windows.zip *
+            artifact_file: fish-engine-${{ github.ref_name }}-windows.zip
 
     env:
       BUILD_TYPE: Release
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.triplet }}
 
     steps:
     - name: Checkout code
@@ -43,43 +47,45 @@ jobs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ matrix.os }}-ccache-release-${{ github.ref }}
+        variant: sccache
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       id: runvcpkg
       with:
-        vcpkgGitCommitId: 'a42af01b72c28a8e6d4e18e4c4cb89e84e57ef9a'
+        vcpkgGitCommitId: 'd5462800eb2cda3d06f9edf50893f570355570d9'
         vcpkgJsonGlob: 'vcpkg.json'
 
     - name: Configure CMake
+      shell: bash
+      # 这句很重要：如果是 MSVC 并且是静态 triplet，要求使用静态运行时库 (/MT)
       run: |
-        cmake -B build \
-          -G Ninja \
+        cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake \
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_TOOLCHAIN_FILE="${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT_OUT }}/scripts/buildsystems/vcpkg.cmake" \
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
-    # 优化 9：跨平台兼容的打包脚本 (统一使用 bash 避免 Windows/Linux 路径问题)
-    - name: Package build artifacts
+    # 关键步骤：使用 CMake Install 提取所需文件 (提取到 staged_install 目录)
+    - name: Install Package
+      run: cmake --install build --prefix staged_install --config ${{ env.BUILD_TYPE }}
+
+    # 跨平台打包 (Windows 打 zip，Linux 打 tar.gz)
+    - name: Archive Release
       shell: bash
-      run: |
-        mkdir -p artifacts/assets
-        # 处理不同操作系统的可执行文件名称差异
-        cp build/${{ matrix.executable_name }} artifacts/
-        if [ -d "assets" ]; then cp -r assets/* artifacts/assets/; fi
-        cd artifacts
-        tar -czf ../fish-engine-${{ github.ref_name }}-${{ matrix.artifact_name }}.tar.gz .
+      working-directory: staged_install
+      run: ${{ matrix.archive_cmd }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: release-artifact-${{ matrix.artifact_name }}
-        path: fish-engine-${{ github.ref_name }}-${{ matrix.artifact_name }}.tar.gz
-        retention-days: 5 # 优化 10：节省云端存储空间
+        path: ${{ matrix.artifact_file }}
+        retention-days: 5
 
   create-release:
     needs: build-release
@@ -90,15 +96,14 @@ jobs:
       with:
         path: release-artifacts
         pattern: release-artifact-*
-        merge-multiple: true # 优化 11：将所有平台的产物下载到同一目录
-
-    - name: Display downloaded artifacts
-      run: ls -la release-artifacts/
+        merge-multiple: true
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2 # 优化 12：升级到 v2
+      uses: softprops/action-gh-release@v2
       with:
-        files: release-artifacts/*.tar.gz
+        files: |
+          release-artifacts/*.tar.gz
+          release-artifacts/*.zip
         generate_release_notes: true
         draft: false
         prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
