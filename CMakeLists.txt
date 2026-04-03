@@ -54,7 +54,12 @@ target_link_libraries(
                           nlohmann_json::nlohmann_json imgui::imgui)
 
 if(MSVC)
+  # 开启 W4 警告
   target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+  # 强制使用 /Z7 (内联调试信息) 而不是 /Zi (外部 PDB)
+  # 这能完美解决 sccache 并发下的 PDB 锁死问题
+  set_property(TARGET ${PROJECT_NAME} PROPERTY
+    MSVC_DEBUG_INFORMATION_FORMAT Embedded)
 else()
   target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
